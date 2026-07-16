@@ -2,7 +2,7 @@
 
 Экспериментальная TypeScript-библиотека для построения декларативных Telegram-интерфейсов поверх [grammY](https://grammy.dev/), вдохновлённая aiogram-dialog.
 
-Проект находится на стадии проектирования API. Текущая архитектура описана в [docs/architecture.md](docs/architecture.md).
+Проект находится на стадии раннего MVP. Текущая архитектура описана в [docs/architecture.md](docs/architecture.md).
 
 ## Цели
 
@@ -35,7 +35,10 @@ const dialogPlugin = dialogs({
     notificationWindow,
   ],
   storage,
-  i18n,
+  i18n: {
+    adapter: translationAdapter,
+    locale: localeResolver,
+  },
 });
 
 bot.use(dialogPlugin);
@@ -64,5 +67,38 @@ await dialogPlugin.runtime.show("notification", {
 });
 ```
 
-Приведённый API является черновым и будет проверен type-only прототипом до реализации runtime.
+## Реализовано в MVP
 
+- `dialogs()` как grammY middleware и runtime для фоновой отправки;
+- `Dialog`, `Window`, функциональный ViewModel и независимый stack каждого instance;
+- несколько одновременно активных instances и dialogless `ui.show()`;
+- opaque/debug callback codec, callback registry, revision и TTL;
+- `StorageAdapter` grammY и встроенный memory adapter;
+- text, inline keyboard, URL buttons и одиночный photo output;
+- focused text/photo input с validation;
+- `go`, `replace`, `back`, `reset`, `close`;
+- locale на stack и полностью адаптерный перевод;
+- member/chat/topic scope и owner/everyone/custom access;
+- factories для custom text, keyboard, media и input widgets;
+- сохраняемое состояние и actions пользовательского keyboard widget;
+- локальный lock на уровне instance;
+- интеграционные тесты через `grammy-testing`.
+
+## Пока не реализовано
+
+- distributed locks и атомарные multi-key storage operations;
+- полноценные presentation/close/input-routing strategies;
+- albums и multi-message surfaces;
+- media types кроме photo;
+- миграции widget/instance state;
+- автоматический cleanup истёкших callbacks и закрытых instances;
+- стабильный publishing/build pipeline.
+
+Публичный API пока является черновым и может меняться по результатам дальнейших type/runtime тестов.
+
+## Проверка
+
+```bash
+bun run typecheck
+bun test
+```

@@ -2,14 +2,18 @@
   "name": "grammy-dialog",
   "module": "src/index.ts",
   "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "grammy-testing": "^0.26.0"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
-    "grammy": "^1.45.0",
-    "grammy-testing": "^0.26.0"
+    "grammy": "^1.45.0"
   }
 }

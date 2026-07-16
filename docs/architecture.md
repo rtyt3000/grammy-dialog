@@ -1,6 +1,6 @@
 # Архитектура grammy-dialog
 
-Статус: draft.
+Статус: draft, реализован первый вертикальный MVP.
 
 Этот документ фиксирует принятые архитектурные решения. Конкретные имена типов и функций пока не считаются стабильным публичным API.
 
@@ -403,13 +403,15 @@ export function confirmButtons(options: ConfirmOptions) {
 Для widgets с собственным состоянием и событиями используются функциональные factories:
 
 ```ts
-export const counter = defineKeyboardWidget<CounterProps>()({
+export const counter = defineKeyboardWidget<CounterProps, number>()({
   state: {
     version: 1,
     initial: props => props.initial ?? 0,
   },
 
   actions: {
+    noop() {},
+
     decrement({ state, props }) {
       state.update(value =>
         Math.max(props.min ?? -Infinity, value - 1),
@@ -425,9 +427,9 @@ export const counter = defineKeyboardWidget<CounterProps>()({
 
   render({ state, actions }) {
     return row(
-      button("−", actions.decrement),
-      button(String(state.value), actions.noop),
-      button("+", actions.increment),
+      button("−", actions.decrement()),
+      button(String(state.value), actions.noop()),
+      button("+", actions.increment()),
     );
   },
 });
@@ -612,3 +614,27 @@ save surface/revision/callbacks
 9. Версионирование и миграции Dialog, Window и widget state после деплоя.
 10. Финальная форма Widget SDK после проверки на реальных сторонних widgets.
 
+## 17. Текущее состояние реализации
+
+Первый вертикальный MVP реализует:
+
+- grammY middleware и внешний runtime handle;
+- Dialog/Window/ViewModel registry;
+- независимые stacks и несколько instances;
+- dialogless Window;
+- grammY `StorageAdapter` и memory adapter;
+- opaque/debug callback codec, callback records, revision и TTL;
+- intent и widget actions;
+- text, inline keyboard, URL и одиночный photo rendering;
+- smart edit/replace для text/photo surface;
+- focused text/photo inputs и validation;
+- locale на stack и translation/locale adapters;
+- member/chat/topic scopes;
+- owner/everyone/custom access policies;
+- factories для text, keyboard, media и input widgets;
+- stateful custom keyboard widgets;
+- локальный instance lock.
+
+Интеграционные тесты покрывают callback rerender, stack navigation, input, i18n/photo, пользовательский stateful widget и общий групповой Dialog.
+
+Следующая итерация должна стабилизировать TypeScript contracts, вынести reconciliation в полноценные presentation strategies и определить recovery для частично успешных storage/Telegram операций.
