@@ -82,6 +82,8 @@ await dialogPlugin.runtime.show("notification", {
 - factories для custom text, keyboard, media и input widgets;
 - сохраняемое состояние и actions пользовательского keyboard widget;
 - локальный lock на уровне instance;
+- repository со структурными snapshots независимо от поведения storage adapter;
+- компенсация initial send, in-place edit и replacement при ошибке persistence;
 - интеграционные тесты через `grammy-testing`.
 
 ## Пока не реализовано
@@ -93,6 +95,27 @@ await dialogPlugin.runtime.show("notification", {
 - миграции widget/instance state;
 - автоматический cleanup истёкших callbacks и закрытых instances;
 - стабильный publishing/build pipeline.
+
+## Структура MVP
+
+```text
+src/
+  core.ts          публичные definitions и базовые типы
+  plugin.ts        grammY middleware
+  runtime.ts       orchestration lifecycle
+  registry.ts      registry Dialog/Window definitions
+  repository.ts    типизированная граница StorageAdapter
+  renderer.ts      Window → RenderedWindow
+  surface.ts       Telegram send/edit/replace и compensation
+  input.ts         сопоставление и нормализация input
+  callbacks.ts     opaque/debug callback codec
+  locks.ts         локальная сериализация операций instance
+  storage.ts       persisted records и memory adapter
+  strategies.ts    scope/access policies
+  widgets.ts       Widget SDK factories
+```
+
+Интеграционные тесты разделены по callbacks, navigation/input, groups, topics, media/i18n, widgets, lifecycle и recovery.
 
 Публичный API пока является черновым и может меняться по результатам дальнейших type/runtime тестов.
 

@@ -338,7 +338,7 @@ gd:scope:<scopeHash>
 
 `StorageAdapter` не гарантирует транзакции или compare-and-swap. Для одного процесса runtime использует lock на уровне instance. Для нескольких процессов может быть предусмотрено необязательное capability-расширение storage с distributed lock/transaction, не ломающее базовую совместимость.
 
-Точная схема, порядок multi-key записей, cleanup и recovery ещё требуют проектирования.
+Доступ к адаптеру инкапсулирован в repository. Repository создаёт структурные snapshots на read/write, поэтому корректность runtime не зависит от того, возвращает адаптер копию или ту же ссылку. Distributed consistency, cleanup и атомарные multi-key операции всё ещё требуют проектирования.
 
 ## 10. i18n
 
@@ -574,7 +574,14 @@ surface operation
 save surface/revision/callbacks
 ```
 
-Точный порядок storage и Telegram side effects ещё должен быть проверен с точки зрения recovery после частичного сбоя.
+Текущий порядок side effects использует компенсацию:
+
+- initial send удаляет orphan message, если instance не удалось сохранить;
+- незафиксированный in-place edit возвращается к предыдущему render и callback-набору;
+- при replacement старое сообщение удаляется только после успешного сохранения нового instance;
+- при ошибке replacement persistence новое orphan message удаляется, а старое остаётся активным.
+
+Компенсация является best-effort и не заменяет distributed transaction. Поведение при одновременной недоступности Telegram и storage остаётся открытым вопросом.
 
 ## 15. MVP
 
@@ -607,7 +614,7 @@ save surface/revision/callbacks
 2. Финальная структура Stack/Frame/widget state.
 3. Storage keys, multi-key consistency, cleanup и multi-process locking.
 4. Точный reconciliation для edit/replace/delete и media transitions.
-5. Recovery, если Telegram и storage обновились только частично.
+5. Recovery, если основная операция и компенсирующая операция завершаются ошибкой одновременно.
 6. TTL callbacks и политика удаления закрытых instances.
 7. Albums, media groups и multi-message surfaces.
 8. Приоритеты нескольких совпавших input widgets.
@@ -637,4 +644,4 @@ save surface/revision/callbacks
 
 Интеграционные тесты покрывают callback rerender, stack navigation, input, i18n/photo, пользовательский stateful widget и общий групповой Dialog.
 
-Следующая итерация должна стабилизировать TypeScript contracts, вынести reconciliation в полноценные presentation strategies и определить recovery для частично успешных storage/Telegram операций.
+Runtime разделён на orchestration, registry, repository, renderer, input matcher, locks и surface manager. Интеграционные suites разделены по функциональным областям. Базовая compensation покрывает initial send, in-place edit и replacement; следующая итерация должна стабилизировать TypeScript contracts и оформить reconciliation как полноценные presentation strategies.

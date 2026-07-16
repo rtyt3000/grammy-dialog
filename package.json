@@ -1,5 +1,5 @@
 {
-  "name": "grammy-dialog",
+  "name": "@ppsh/grammy-dialog",
   "module": "src/index.ts",
   "type": "module",
   "scripts": {
