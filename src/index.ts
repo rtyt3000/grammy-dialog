@@ -52,8 +52,18 @@ export {
   defineInputWidget,
   defineMediaWidget,
   defineTextWidget,
+  type InputWidgetFactory,
+  type KeyboardLayoutFactory,
+  type KeyboardWidgetFactory,
+  type MediaWidgetFactory,
+  type TextWidgetFactory,
 } from "./widgets.js";
-export { access, scopes } from "./strategies.js";
+export {
+  access,
+  scopes,
+  type AccessStrategies,
+  type ScopeStrategies,
+} from "./strategies.js";
 export {
   createCallbackCodec,
   type CallbackCodec,

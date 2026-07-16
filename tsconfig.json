@@ -11,6 +11,11 @@
 
     // Bundler mode
     "moduleResolution": "bundler",
+    "baseUrl": ".",
+    "paths": {
+      "@ppsh/grammy-dialog": ["./src/index.ts"],
+      "@ppsh/grammy-dialog/widgets": ["./src/widgets.ts"]
+    },
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,

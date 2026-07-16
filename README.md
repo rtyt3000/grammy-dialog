@@ -4,6 +4,19 @@
 
 Проект находится на стадии раннего MVP. Текущая архитектура описана в [docs/architecture.md](docs/architecture.md).
 
+## Установка
+
+```bash
+npm install @ppsh/grammy-dialog grammy
+```
+
+Пакет публикует основной entrypoint и отдельный Widget SDK:
+
+```ts
+import { dialogs, window } from "@ppsh/grammy-dialog";
+import { defineKeyboardWidget } from "@ppsh/grammy-dialog/widgets";
+```
+
 ## Цели
 
 - декларативные окна, навигация и переиспользуемые widgets;
@@ -22,7 +35,7 @@ import { Bot, type Context } from "grammy";
 import {
   dialogs,
   type DialogFlavor,
-} from "grammy-dialog";
+} from "@ppsh/grammy-dialog";
 
 type BotContext = Context & DialogFlavor;
 
@@ -117,11 +130,17 @@ src/
 
 Интеграционные тесты разделены по callbacks, navigation/input, groups, topics, media/i18n, widgets, lifecycle и recovery.
 
+Полный компилируемый пример находится в [examples/showcase](examples/showcase): personal/shared dialogs, i18n, text/photo input, stateful widget и dialogless media window.
+
 Публичный API пока является черновым и может меняться по результатам дальнейших type/runtime тестов.
 
 ## Проверка
 
 ```bash
 bun run typecheck
+bun run typecheck:api
 bun test
+bun run build
 ```
+
+Полная локальная проверка перед публикацией запускается через `bun run check`.

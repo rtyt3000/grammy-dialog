@@ -1,19 +1,44 @@
 {
   "name": "@ppsh/grammy-dialog",
-  "module": "src/index.ts",
+  "version": "0.1.0",
+  "description": "Declarative, MVVM-inspired dialog runtime for grammY",
   "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./widgets": {
+      "types": "./dist/widgets.d.ts",
+      "import": "./dist/widgets.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "license": "MIT",
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typecheck:api": "tsc -p tsconfig.type-tests.json",
+    "typecheck:package": "tsc -p tsconfig.package-smoke.json",
+    "check": "bun run typecheck && bun run typecheck:api && bun test && bun run build && bun run typecheck:package",
+    "prepack": "bun run check"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "grammy-testing": "^0.26.0"
+    "grammy": "^1.45.0",
+    "grammy-testing": "^0.26.0",
+    "typescript": "^5.9.3"
   },
   "peerDependencies": {
-    "typescript": "^5"
-  },
-  "dependencies": {
     "grammy": "^1.45.0"
   }
 }

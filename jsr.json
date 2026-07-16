@@ -2,5 +2,18 @@
   "name": "@ppsh/grammy-dialog",
   "version": "0.1.0",
   "license": "MIT",
-  "exports": "./mod.ts"
+  "exports": {
+    ".": "./mod.ts",
+    "./widgets": "./widgets.ts"
+  },
+  "publish": {
+    "exclude": [
+      "./dist",
+      "./test",
+      "./type-tests",
+      "./tsconfig.build.json",
+      "./tsconfig.package-smoke.json",
+      "./tsconfig.type-tests.json"
+    ]
+  }
 }

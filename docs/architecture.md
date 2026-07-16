@@ -445,7 +445,7 @@ import {
   defineKeyboardWidget,
   defineMediaWidget,
   defineInputWidget,
-} from "grammy-dialog/widgets";
+} from "@ppsh/grammy-dialog/widgets";
 ```
 
 Внутренние renderer/storage типы не должны становиться частью Widget API.

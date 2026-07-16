@@ -6,7 +6,14 @@ function requireChat<C extends Context>(ctx: C): number {
   return ctx.chat.id;
 }
 
-export const scopes = {
+export interface ScopeStrategies {
+  member<C extends Context = Context>(): ScopeStrategy<C>;
+  chat<C extends Context = Context>(): ScopeStrategy<C>;
+  topic<C extends Context = Context>(): ScopeStrategy<C>;
+  custom<C extends Context = Context>(strategy: ScopeStrategy<C>): ScopeStrategy<C>;
+}
+
+export const scopes: ScopeStrategies = {
   member<C extends Context = Context>(): ScopeStrategy<C> {
     return {
       id: "member",
@@ -45,7 +52,13 @@ export const scopes = {
   },
 };
 
-export const access = {
+export interface AccessStrategies {
+  owner<C extends Context = Context>(): AccessStrategy<C>;
+  everyone<C extends Context = Context>(): AccessStrategy<C>;
+  custom<C extends Context = Context>(strategy: AccessStrategy<C>): AccessStrategy<C>;
+}
+
+export const access: AccessStrategies = {
   owner<C extends Context = Context>(): AccessStrategy<C> {
     return {
       id: "owner",

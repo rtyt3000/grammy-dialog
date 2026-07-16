@@ -11,8 +11,14 @@ import type {
   WidgetActionHandler,
 } from "./core.js";
 
-export function defineTextWidget<Props>() {
-  return function define<
+export interface TextWidgetFactory<Props> {
+  <C extends Context = Context, View = unknown, Services = unknown>(definition: {
+    render(context: RenderContext<C, View, Services> & { readonly props: Props }): Awaitable<string>;
+  }): (props: Props) => TextSource<C, View, Services>;
+}
+
+export function defineTextWidget<Props>(): TextWidgetFactory<Props> {
+  return (function define<
     C extends Context = Context,
     View = unknown,
     Services = unknown,
@@ -21,10 +27,22 @@ export function defineTextWidget<Props>() {
   }) {
     return (props: Props): TextSource<C, View, Services> => context =>
       definition.render({ ...context, props });
-  };
+  }) as TextWidgetFactory<Props>;
 }
 
-export function defineMediaWidget<Props>() {
+export interface MediaWidgetFactory<Props> {
+  <C extends Context = Context, View = unknown, Services = unknown>(definition: {
+    render(
+      context: RenderContext<C, View, Services> & { readonly props: Props },
+    ): Awaitable<PhotoDefinition<C, View, Services> | undefined>;
+  }): (
+    props: Props,
+  ) => (
+    context: RenderContext<C, View, Services>,
+  ) => Awaitable<PhotoDefinition<C, View, Services> | undefined>;
+}
+
+export function defineMediaWidget<Props>(): MediaWidgetFactory<Props> {
   return function define<
     C extends Context = Context,
     View = unknown,
@@ -39,7 +57,17 @@ export function defineMediaWidget<Props>() {
   };
 }
 
-export function defineInputWidget<Props, Value>() {
+export interface InputWidgetFactory<Props, Value> {
+  <C extends Context = Context>(definition: {
+    match(ctx: C, props: Props): Awaitable<boolean>;
+    parse(ctx: C, props: Props): Awaitable<Value>;
+    validate?: (value: Value, props: Props) => Awaitable<import("./core.js").InputValidation<Value>>;
+  }): (
+    props: Props & { readonly id: string; readonly onReceive: string },
+  ) => CustomInputDefinition<C, Value>;
+}
+
+export function defineInputWidget<Props, Value>(): InputWidgetFactory<Props, Value> {
   return function define<C extends Context = Context>(definition: {
     match(ctx: C, props: Props): Awaitable<boolean>;
     parse(ctx: C, props: Props): Awaitable<Value>;
@@ -64,8 +92,24 @@ export function defineInputWidget<Props, Value>() {
   };
 }
 
-export function defineKeyboardWidget<Props, State>() {
-  return function define<
+export interface KeyboardWidgetFactory<Props, State> {
+  <
+    C extends Context = Context,
+    View = unknown,
+    Services = unknown,
+    Actions extends Record<string, WidgetActionHandler<C, Props, State, Services>> = Record<
+      string,
+      WidgetActionHandler<C, Props, State, Services>
+    >,
+  >(
+    definition: KeyboardWidgetDefinition<C, View, Services, Props, State, Actions>,
+  ): (
+    props: Props & { readonly id: string },
+  ) => KeyboardWidgetInstance<C, View, Services, Props, State>;
+}
+
+export function defineKeyboardWidget<Props, State>(): KeyboardWidgetFactory<Props, State> {
+  return (function define<
     C extends Context = Context,
     View = unknown,
     Services = unknown,
@@ -85,10 +129,22 @@ export function defineKeyboardWidget<Props, State>() {
         definition,
       };
     };
-  };
+  }) as KeyboardWidgetFactory<Props, State>;
 }
 
-export function defineKeyboardLayout<Props>() {
+export interface KeyboardLayoutFactory<Props> {
+  <C extends Context = Context, View = unknown, Services = unknown>(definition: {
+    render(
+      context: RenderContext<C, View, Services> & { readonly props: Props },
+    ): Awaitable<KeyboardDefinition<C, View, Services>>;
+  }): (
+    props: Props,
+  ) => (
+    context: RenderContext<C, View, Services>,
+  ) => Awaitable<KeyboardDefinition<C, View, Services>>;
+}
+
+export function defineKeyboardLayout<Props>(): KeyboardLayoutFactory<Props> {
   return function define<
     C extends Context = Context,
     View = unknown,
