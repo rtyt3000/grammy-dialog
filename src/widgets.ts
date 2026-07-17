@@ -5,7 +5,9 @@ import type {
   KeyboardDefinition,
   KeyboardWidgetDefinition,
   KeyboardWidgetInstance,
-  PhotoDefinition,
+  KeyboardWidgetOptions,
+  MediaDefinition,
+  MediaKind,
   RenderContext,
   TextSource,
   WidgetActionHandler,
@@ -34,12 +36,12 @@ export interface MediaWidgetFactory<Props> {
   <C extends Context = Context, View = unknown, Services = unknown>(definition: {
     render(
       context: RenderContext<C, View, Services> & { readonly props: Props },
-    ): Awaitable<PhotoDefinition<C, View, Services> | undefined>;
+    ): Awaitable<MediaDefinition<MediaKind, C, View, Services> | undefined>;
   }): (
     props: Props,
   ) => (
     context: RenderContext<C, View, Services>,
-  ) => Awaitable<PhotoDefinition<C, View, Services> | undefined>;
+  ) => Awaitable<MediaDefinition<MediaKind, C, View, Services> | undefined>;
 }
 
 export function defineMediaWidget<Props>(): MediaWidgetFactory<Props> {
@@ -50,7 +52,7 @@ export function defineMediaWidget<Props>(): MediaWidgetFactory<Props> {
   >(definition: {
     render(
       context: RenderContext<C, View, Services> & { readonly props: Props },
-    ): Awaitable<PhotoDefinition<C, View, Services> | undefined>;
+    ): Awaitable<MediaDefinition<MediaKind, C, View, Services> | undefined>;
   }) {
     return (props: Props) => (context: RenderContext<C, View, Services>) =>
       definition.render({ ...context, props });
@@ -63,7 +65,7 @@ export interface InputWidgetFactory<Props, Value> {
     parse(ctx: C, props: Props): Awaitable<Value>;
     validate?: (value: Value, props: Props) => Awaitable<import("./core.js").InputValidation<Value>>;
   }): (
-    props: Props & { readonly id: string; readonly onReceive: string },
+    props: Props & { readonly id: string; readonly onReceive?: string },
   ) => CustomInputDefinition<C, Value>;
 }
 
@@ -74,9 +76,9 @@ export function defineInputWidget<Props, Value>(): InputWidgetFactory<Props, Val
     validate?: (value: Value, props: Props) => Awaitable<import("./core.js").InputValidation<Value>>;
   }) {
     return (
-      props: Props & { readonly id: string; readonly onReceive: string },
+      props: Props & { readonly id: string; readonly onReceive?: string },
     ): CustomInputDefinition<C, Value> => {
-      const { id, onReceive, ...inputProps } = props;
+      const { id, onReceive = id, ...inputProps } = props;
       const resolvedProps = inputProps as Props;
       return {
         kind: "custom",
@@ -102,7 +104,7 @@ export interface KeyboardWidgetFactory<Props, State> {
       WidgetActionHandler<C, Props, State, Services>
     >,
   >(
-    definition: KeyboardWidgetDefinition<C, View, Services, Props, State, Actions>,
+    definition: KeyboardWidgetOptions<C, View, Services, Props, State, Actions>,
   ): (
     props: Props & { readonly id: string },
   ) => KeyboardWidgetInstance<C, View, Services, Props, State>;
@@ -117,7 +119,15 @@ export function defineKeyboardWidget<Props, State>(): KeyboardWidgetFactory<Prop
       string,
       WidgetActionHandler<C, Props, State, Services>
     >,
-  >(definition: KeyboardWidgetDefinition<C, View, Services, Props, State, Actions>) {
+  >(definition: KeyboardWidgetOptions<C, View, Services, Props, State, Actions>) {
+    const normalized: KeyboardWidgetDefinition<C, View, Services, Props, State, Actions> = {
+      ...definition,
+      state: {
+        version: definition.state.version ?? 1,
+        initial: definition.state.initial,
+      },
+      actions: definition.actions,
+    };
     return (
       props: Props & { readonly id: string },
     ): KeyboardWidgetInstance<C, View, Services, Props, State> => {
@@ -126,7 +136,7 @@ export function defineKeyboardWidget<Props, State>(): KeyboardWidgetFactory<Prop
         kind: "keyboard-widget",
         id,
         props: widgetProps as Props,
-        definition,
+        definition: normalized,
       };
     };
   }) as KeyboardWidgetFactory<Props, State>;

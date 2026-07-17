@@ -44,6 +44,10 @@ const profileDialog = defineDialog({
 
 `Window` — декларативное View. Оно не обращается напрямую к storage и не решает, каким Telegram-методом обновлять сообщение.
 
+Для статических Window поле `viewModel` необязательно: factory подставляет пустое
+состояние и пустой view. `parseMode` хранится в Window и применяется renderer-ом
+к message text либо media caption.
+
 ```ts
 const profileWindow = window("profile.overview", {
   viewModel: profileViewModel,
@@ -251,13 +255,10 @@ input: inputs.custom(router);
 Отвечает на вопрос: как применить новый render к Telegram surface?
 
 ```ts
-presentation: surfaces.edit();
-presentation: surfaces.replace();
-presentation: surfaces.append();
-presentation: surfaces.smart({
-  prefer: "edit",
-  fallback: "replace",
-});
+presentation: presentations.edit({ fallback: "replace" });
+presentation: presentations.replace();
+presentation: presentations.send();
+presentation: presentations.auto();
 ```
 
 ### Close
@@ -265,9 +266,9 @@ presentation: surfaces.smart({
 Отвечает на вопрос: что оставить после закрытия instance?
 
 ```ts
-close: close.delete();
-close: close.keep();
-close: close.removeKeyboard();
+close: closeStrategies.delete();
+close: closeStrategies.keep();
+close: closeStrategies.detach();
 close: close.replaceWith(closedWindow);
 ```
 
@@ -276,6 +277,12 @@ close: close.replaceWith(closedWindow);
 ```text
 runtime defaults → Dialog → Window → start/show options
 ```
+
+Декларативный DSL также убирает безопасный boilerplate: статическое окно получает
+пустой ViewModel, identity-ViewModel может состоять только из `initialState`, первое
+окно Dialog становится `initial`, input вызывает одноимённый с его `id` intent, а
+версия состояния keyboard widget равна `1`. Значения, меняющие смысл определения
+(`id`, action, media source), не выводятся неявно.
 
 ## 8. Callbacks
 
@@ -632,9 +639,10 @@ save surface/revision/callbacks
 - grammY `StorageAdapter` и memory adapter;
 - opaque/debug callback codec, callback records, revision и TTL;
 - intent и widget actions;
-- text, inline keyboard, URL и одиночный photo rendering;
-- smart edit/replace для text/photo surface;
-- focused text/photo inputs и validation;
+- text, inline keyboard, URL и photo/video/animation/audio/document/voice rendering;
+- auto/edit/replace/send presentation и keep/detach/delete close strategies;
+- text/media/file/sticker/contact/location/message/custom inputs и validation;
+- latest/oldest/reply/custom input routing по упорядоченному focus record v2;
 - locale на stack и translation/locale adapters;
 - member/chat/topic scopes;
 - owner/everyone/custom access policies;
@@ -644,4 +652,4 @@ save surface/revision/callbacks
 
 Интеграционные тесты покрывают callback rerender, stack navigation, input, i18n/photo, пользовательский stateful widget и общий групповой Dialog.
 
-Runtime разделён на orchestration, registry, repository, renderer, input matcher, locks и surface manager. Интеграционные suites разделены по функциональным областям. Базовая compensation покрывает initial send, in-place edit и replacement; следующая итерация должна стабилизировать TypeScript contracts и оформить reconciliation как полноценные presentation strategies.
+Код разделён по каталогам `runtime`, `presentation`, `input-routing`, `persistence`, `callbacks`, `policies` и `integration`. Showcase отдельно раскладывает dialogs, standalone windows, widgets, i18n и services. Интеграционные suites покрывают lifecycle, recovery, presentation strategies, несколько focus candidates и расширенные media/input типы.

@@ -1,37 +1,67 @@
 export {
   back,
+  animation,
+  animationInput,
+  audio,
+  audioInput,
   button,
   close,
   defineDialog,
+  document,
+  documentInput,
   go,
   intent,
   invalid,
+  contactInput,
+  locationInput,
+  messageInput,
   photo,
   photoInput,
   replace,
   reset,
   t,
   textInput,
+  stickerInput,
   urlButton,
   valid,
+  video,
+  videoInput,
   viewModel,
+  voice,
+  voiceInput,
   window,
   type Awaitable,
   type AccessInstance,
   type AccessStrategy,
+  type AnimationDefinition,
+  type AnimationInputValue,
+  type AttachmentInputDefinition,
+  type AttachmentInputKind,
+  type AudioDefinition,
+  type AudioInputValue,
   type ButtonAction,
   type ButtonDefinition,
   type DialogDefinition,
   type DialogResource,
   type InputDefinition,
+  type InputBindingOptions,
   type CustomInputDefinition,
+  type ContactInputValue,
+  type DocumentDefinition,
+  type FileInputValue,
   type InputValidation,
   type IntentContext,
   type KeyboardDefinition,
   type KeyboardNode,
   type KeyboardWidgetDefinition,
   type KeyboardWidgetInstance,
+  type KeyboardWidgetOptions,
   type LocaleResolver,
+  type LocationInputValue,
+  type MediaDefinition,
+  type MediaFileSource,
+  type MediaKind,
+  type MessageInputValue,
   type NavigationController,
   type PhotoInputValue,
   type RenderContext,
@@ -40,11 +70,16 @@ export {
   type StateHandle,
   type TextSource,
   type TranslationAdapter,
+  type VideoDefinition,
+  type VideoInputValue,
   type ViewModelDefinition,
   type WindowDefinition,
   type WidgetAction,
   type WidgetActionContext,
   type WidgetActionHandler,
+  type VoiceDefinition,
+  type VoiceInputValue,
+  type StickerInputValue,
 } from "./core.js";
 export {
   defineKeyboardLayout,
@@ -63,26 +98,28 @@ export {
   scopes,
   type AccessStrategies,
   type ScopeStrategies,
-} from "./strategies.js";
+} from "./policies/scope-access.js";
 export {
   createCallbackCodec,
   type CallbackCodec,
   type CallbackCodecOptions,
-} from "./callbacks.js";
+} from "./callbacks/codec.js";
 export {
   dialogs,
   type DialogPlugin,
-} from "./plugin.js";
+} from "./integration/grammy-plugin.js";
 export {
   DialogRuntime,
-  type DialogController,
-  type DialogFlavor,
-  type DialogRuntimeOptions,
-  type InstanceHandle,
-  type ShowOptions,
-  type StartOptions,
-  type UiController,
-} from "./runtime.js";
+} from "./runtime/dialog-runtime.js";
+export type {
+  DialogController,
+  DialogFlavor,
+  DialogRuntimeOptions,
+  InstanceHandle,
+  ShowOptions,
+  StartOptions,
+  UiController,
+} from "./runtime/contracts.js";
 export {
   MemoryStorageAdapter,
   type CallbackRecord,
@@ -90,4 +127,29 @@ export {
   type InstanceRecord,
   type StackFrame,
   type SurfaceReference,
-} from "./storage.js";
+} from "./persistence/storage.js";
+export {
+  closeStrategies,
+  isRecoverableEditError,
+  presentations,
+  type CloseStrategies,
+  type PresentationStrategies,
+} from "./presentation/strategies.js";
+export type {
+  CloseOperation,
+  ClosePlanContext,
+  CloseStrategy,
+  PresentationOperation,
+  PresentationPlanContext,
+  PresentationStrategy,
+  SurfaceKind,
+} from "./presentation/contracts.js";
+export {
+  inputRouting,
+  type InputRoutingStrategies,
+} from "./input-routing/strategies.js";
+export type {
+  InputRouteCandidate,
+  InputRoutingContext,
+  InputRoutingStrategy,
+} from "./input-routing/contracts.js";

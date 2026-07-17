@@ -1,9 +1,9 @@
 import type { Context, MiddlewareFn } from "grammy";
-import {
-  DialogRuntime,
-  type DialogFlavor,
-  type DialogRuntimeOptions,
-} from "./runtime.js";
+import { DialogRuntime } from "../runtime/dialog-runtime.js";
+import type {
+  DialogFlavor,
+  DialogRuntimeOptions,
+} from "../runtime/contracts.js";
 
 export type DialogPlugin<
   C extends Context = Context,

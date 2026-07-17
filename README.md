@@ -69,6 +69,50 @@ bot.command("notification", ctx =>
 );
 ```
 
+Для статического окна ViewModel не нужен. `parseMode` одинаково применяется к
+обычному тексту и media caption:
+
+```ts
+const helpWindow = window("help", {
+  text: "<b>Help</b>",
+  parseMode: "HTML",
+});
+```
+
+## Значения по умолчанию
+
+Обычные случаи не требуют пустого boilerplate:
+
+```ts
+const counterVm = viewModel({
+  initialState: { count: 0 },
+  intents: {
+    increment({ state }) {
+      state.update(current => ({ count: current.count + 1 }));
+    },
+  },
+});
+
+const counterDialog = defineDialog({
+  id: "counter",
+  windows: { main: counterWindow }, // первое окно становится initial
+});
+
+textInput("saveName"); // вызывает intent "saveName"
+```
+
+- у статического `window()` автоматически создаётся пустой ViewModel;
+- у `viewModel()` состояние по умолчанию `{}`, `load` возвращает текущее state, а `intents` равен `{}`;
+- `defineDialog()` выбирает первое объявленное окно, если `initial` не указан;
+- все встроенные и custom input widgets используют свой `id` как `onReceive`;
+- schema version состояния keyboard widget равна `1`;
+- runtime использует memory storage, locale `en`, member scope, owner access,
+  `presentations.auto()`, `closeStrategies.detach()` и `inputRouting.latest()`;
+- callbacks по умолчанию непрозрачны, имеют префикс `gd:` и TTL 7 дней.
+
+Поля, определяющие смысл компонента (`id`, button action, media source и actions
+stateful-виджета), остаются обязательными.
+
 Dialogless-окна должны быть доступны и вне входящего update:
 
 ```ts
@@ -87,11 +131,14 @@ await dialogPlugin.runtime.show("notification", {
 - несколько одновременно активных instances и dialogless `ui.show()`;
 - opaque/debug callback codec, callback registry, revision и TTL;
 - `StorageAdapter` grammY и встроенный memory adapter;
-- text, inline keyboard, URL buttons и одиночный photo output;
-- focused text/photo input с validation;
+- text, inline keyboard, URL buttons и photo/video/animation/audio/document/voice output;
+- text, media, file, sticker, contact, location, raw-message и custom input widgets;
 - `go`, `replace`, `back`, `reset`, `close`;
 - locale на stack и полностью адаптерный перевод;
 - member/chat/topic scope и owner/everyone/custom access;
+- auto/edit/replace/send presentation strategies и keep/detach/delete close strategies;
+- latest/oldest/reply/custom input routing поверх стека активных instances;
+- сериализация focus commit/recovery по ключу chat/topic/user;
 - factories для custom text, keyboard, media и input widgets;
 - сохраняемое состояние и actions пользовательского keyboard widget;
 - локальный lock на уровне instance;
@@ -102,9 +149,7 @@ await dialogPlugin.runtime.show("notification", {
 ## Пока не реализовано
 
 - distributed locks и атомарные multi-key storage operations;
-- полноценные presentation/close/input-routing strategies;
 - albums и multi-message surfaces;
-- media types кроме photo;
 - миграции widget/instance state;
 - автоматический cleanup истёкших callbacks и закрытых instances;
 - стабильный publishing/build pipeline.
@@ -113,24 +158,21 @@ await dialogPlugin.runtime.show("notification", {
 
 ```text
 src/
-  core.ts          публичные definitions и базовые типы
-  plugin.ts        grammY middleware
-  runtime.ts       orchestration lifecycle
-  registry.ts      registry Dialog/Window definitions
-  repository.ts    типизированная граница StorageAdapter
-  renderer.ts      Window → RenderedWindow
-  surface.ts       Telegram send/edit/replace и compensation
-  input.ts         сопоставление и нормализация input
-  callbacks.ts     opaque/debug callback codec
-  locks.ts         локальная сериализация операций instance
-  storage.ts       persisted records и memory adapter
-  strategies.ts    scope/access policies
-  widgets.ts       Widget SDK factories
+  callbacks/       callback codec
+  definitions/     actions, ViewModel, Window, keyboard, media и input contracts
+  input-routing/   routing contracts и built-in strategies
+  integration/     grammY middleware
+  persistence/     storage records и repository
+  policies/        scope/access policies
+  presentation/    planner, presentation и close strategies
+  runtime/         orchestration, rendering, surfaces, locks и input matching
+  core.ts          совместимый facade над public definitions
+  widgets.ts       стабильный Widget SDK facade
 ```
 
 Интеграционные тесты разделены по callbacks, navigation/input, groups, topics, media/i18n, widgets, lifecycle и recovery.
 
-Полный компилируемый пример находится в [examples/showcase](examples/showcase): personal/shared dialogs, i18n, text/photo input, stateful widget и dialogless media window.
+Полный компилируемый пример находится в [examples/showcase](examples/showcase): personal/shared dialogs, i18n, text/photo input, stateful widget, routing/presentation defaults и dialogless media window.
 
 Публичный API пока является черновым и может меняться по результатам дальнейших type/runtime тестов.
 

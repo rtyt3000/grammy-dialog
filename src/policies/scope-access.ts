@@ -1,5 +1,5 @@
 import type { Context } from "grammy";
-import type { AccessStrategy, ScopeStrategy } from "./core.js";
+import type { AccessStrategy, ScopeStrategy } from "../core.js";
 
 function requireChat<C extends Context>(ctx: C): number {
   if (ctx.chat === undefined) throw new Error("A dialog scope requires a chat");

@@ -13,7 +13,7 @@ import type { TestContext } from "./helpers.js";
 describe("custom widgets", () => {
   test("runs a stateful keyboard widget", async () => {
     const counter = defineKeyboardWidget<{ step: number }, number>()({
-      state: { version: 1, initial: () => 0 },
+      state: { initial: () => 0 },
       actions: {
         increment({ state, props }) {
           state.update(value => value + props.step);
@@ -23,7 +23,7 @@ describe("custom widgets", () => {
         return [[button(`Widget: ${state.value}`, actions.increment())]];
       },
     });
-    const vm = viewModel({ initialState: {}, load: ({ state }) => state, intents: {} });
+    const vm = viewModel();
     const custom = window("custom", {
       viewModel: vm,
       text: "Custom widget",

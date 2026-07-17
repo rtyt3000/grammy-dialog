@@ -8,6 +8,10 @@ This example keeps the important MVP scenarios in one place:
 - `/report` — a dialogless photo window;
 - `sendReportFromBackground` — sending the same window with `bot.api` outside an incoming update.
 
+The plugin configuration also demonstrates automatic presentation fallback,
+detaching keyboards on close, and reply-aware routing between active inputs.
+The counter and report windows omit ViewModel entirely; the report caption uses HTML parse mode.
+
 Create the bot and start grammY from your application entrypoint:
 
 ```ts

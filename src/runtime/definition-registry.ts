@@ -3,8 +3,8 @@ import type {
   DialogDefinition,
   DialogResource,
   WindowDefinition,
-} from "./core.js";
-import type { InstanceRecord } from "./storage.js";
+} from "../core.js";
+import type { InstanceRecord } from "../persistence/storage.js";
 
 export type AnyWindow<C extends Context> = WindowDefinition<C, any, any, any>;
 

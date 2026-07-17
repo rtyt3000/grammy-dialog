@@ -1,7 +1,6 @@
 import type {
   Api,
   Context,
-  StorageAdapter,
 } from "grammy";
 import {
   type AccessStrategy,
@@ -14,75 +13,46 @@ import {
   StateHandle,
   type TranslationAdapter,
   type WindowDefinition,
-} from "./core.js";
+} from "../core.js";
 import {
   createCallbackCodec,
   type CallbackCodec,
   type CallbackCodecOptions,
-} from "./callbacks.js";
+} from "../callbacks/codec.js";
 import {
   type CallbackRecord,
   type DialogStorageRecord,
   type InstanceRecord,
   MemoryStorageAdapter,
-} from "./storage.js";
-import { access, scopes } from "./strategies.js";
-import { DefinitionRegistry, type AnyWindow } from "./registry.js";
-import { DialogRepository } from "./repository.js";
-import { KeyedLocks } from "./locks.js";
-import { WindowRenderer } from "./renderer.js";
-import { SurfaceManager } from "./surface.js";
-import { InputMatcher } from "./input.js";
-
-export interface DialogRuntimeOptions<
-  C extends Context = Context,
-  Services = unknown,
-> {
-  list: ReadonlyArray<import("./core.js").DialogResource<C>>;
-  storage?: StorageAdapter<DialogStorageRecord>;
-  services?: Services;
-  callbacks?: CallbackCodecOptions | CallbackCodec;
-  i18n?: {
-    adapter: TranslationAdapter;
-    locale?: LocaleResolver<C>;
-  };
-  defaultLocale?: string;
-  callbackTtlMs?: number;
-  defaults?: {
-    scope?: ScopeStrategy<C>;
-    access?: AccessStrategy<C>;
-  };
-}
-
-export interface StartOptions {
-  data?: unknown;
-  locale?: string;
-}
-
-export interface ShowOptions extends StartOptions {
-  chatId?: number;
-  actorId?: number;
-  threadId?: number;
-  api?: Api;
-}
-
-export interface InstanceHandle {
-  readonly id: string;
-}
-
-export interface DialogController {
-  start(dialog: string | DialogDefinition, options?: StartOptions): Promise<InstanceHandle>;
-  setLocale(instanceId: string, locale: string): Promise<void>;
-}
-
-export interface UiController {
-  show(window: string | WindowDefinition, options?: ShowOptions): Promise<InstanceHandle>;
-}
-
-export interface DialogFlavor {
-  dialog: DialogController;
-  ui: UiController;
-}
+} from "../persistence/storage.js";
+import { access, scopes } from "../policies/scope-access.js";
+import { DefinitionRegistry, type AnyWindow } from "./definition-registry.js";
+import { DialogRepository } from "../persistence/dialog-repository.js";
+import { KeyedLocks } from "./keyed-locks.js";
+import { WindowRenderer } from "./window-renderer.js";
+import { SurfaceManager } from "./surface-manager.js";
+import { InputMatcher } from "./input-matcher.js";
+import { PresentationPlanner } from "../presentation/planner.js";
+import {
+  closeStrategies,
+  presentations,
+} from "../presentation/strategies.js";
+import type {
+  CloseStrategy,
+  PresentationStrategy,
+} from "../presentation/contracts.js";
+import { inputRouting } from "../input-routing/strategies.js";
+import type { InputRoutingStrategy } from "../input-routing/contracts.js";
+import { FocusManager } from "./focus-manager.js";
+import type {
+  DialogController,
+  DialogFlavor,
+  DialogRuntimeOptions,
+  InstanceHandle,
+  ShowOptions,
+  StartOptions,
+  UiController,
+} from "./contracts.js";
 
 export class DialogRuntime<
   C extends Context = Context,
@@ -99,11 +69,14 @@ export class DialogRuntime<
   private readonly defaultLocale: string;
   private readonly defaultScope: ScopeStrategy<C>;
   private readonly defaultAccess: AccessStrategy<C>;
+  private readonly inputRouting: InputRoutingStrategy<C>;
   private readonly locks = new KeyedLocks();
+  private readonly focus: FocusManager;
 
   public constructor(options: DialogRuntimeOptions<C, Services>) {
     const storage = options.storage ?? new MemoryStorageAdapter<DialogStorageRecord>();
     this.repository = new DialogRepository(storage);
+    this.focus = new FocusManager(this.repository);
     this.registry = new DefinitionRegistry(options.list);
     this.services = options.services as Services;
     this.codec = "encode" in (options.callbacks ?? {})
@@ -119,9 +92,15 @@ export class DialogRuntime<
       translator: options.i18n?.adapter,
       callbackTtlMs: options.callbackTtlMs ?? 7 * 24 * 60 * 60 * 1000,
     });
-    this.surfaces = new SurfaceManager(this.renderer, this.repository);
+    this.surfaces = new SurfaceManager(
+      this.renderer,
+      this.repository,
+      new PresentationPlanner(options.defaults?.presentation ?? presentations.auto()),
+      options.defaults?.close ?? closeStrategies.detach(),
+    );
     this.defaultScope = options.defaults?.scope ?? scopes.member<C>();
     this.defaultAccess = options.defaults?.access ?? access.owner<C>();
+    this.inputRouting = options.defaults?.inputRouting ?? inputRouting.latest<C>();
   }
 
   public controller(ctx: C): DialogController {
@@ -166,7 +145,7 @@ export class DialogRuntime<
       state: initial.viewModel.initialState(),
     });
 
-    await this.commitWithFocus(instance, instance.ownerId, () =>
+    await this.focus.commit(instance, instance.ownerId, () =>
       this.surfaces.mount(ctx.api, instance, ctx)
     );
     return { id: instance.id };
@@ -196,7 +175,7 @@ export class DialogRuntime<
       state: selectedWindow.viewModel.initialState(),
     });
 
-    await this.commitWithFocus(instance, instance.ownerId, () =>
+    await this.focus.commit(instance, instance.ownerId, () =>
       this.surfaces.mount(options.api!, instance, ctx)
     );
     return { id: instance.id };
@@ -223,12 +202,19 @@ export class DialogRuntime<
 
   public async handleInput(ctx: C): Promise<boolean> {
     if (ctx.chat === undefined || ctx.from === undefined || ctx.message === undefined) return false;
-    const focusedInstanceId = await this.repository.readFocus(
+    const focusedInstanceIds = await this.repository.readFocusIds(
       ctx.chat.id,
       ctx.from.id,
       this.messageThreadId(ctx),
     );
+    const candidates = (await Promise.all(
+      focusedInstanceIds.map(id => this.repository.readInstance(id)),
+    )).filter((instance): instance is InstanceRecord =>
+      instance !== undefined && instance.status === "active"
+    ).map(instance => ({ id: instance.id, instance }));
+    const focusedInstanceId = await this.inputRouting.route({ ctx, candidates });
     if (focusedInstanceId === undefined) return false;
+    if (!candidates.some(candidate => candidate.id === focusedInstanceId)) return false;
 
     return this.locks.run(focusedInstanceId, async () => {
       const instance = await this.repository.readInstance(focusedInstanceId);
@@ -319,7 +305,7 @@ export class DialogRuntime<
       this.applyNavigation(instance, callback.action);
     }
     if (instance.status === "active") {
-      await this.commitWithFocus(instance, ctx.from?.id, () =>
+      await this.focus.commit(instance, ctx.from?.id, () =>
         this.finishUpdate(ctx.api, instance, ctx)
       );
     } else {
@@ -398,12 +384,28 @@ export class DialogRuntime<
   private async finishUpdate(api: Api, instance: InstanceRecord, ctx?: C): Promise<void> {
     instance.revision += 1;
     if (instance.status === "closed") {
-      await this.surfaces.detachKeyboard(api, instance);
+      const surface = instance.surface;
+      const operation = await this.surfaces.planClose(instance);
       const oldTokens = instance.callbackTokens;
+      const focusedUserIds = instance.focusedUserIds;
       instance.callbackTokens = [];
-      await this.repository.deleteCallbacks(oldTokens);
-      await this.clearFocus(instance);
+      instance.focusedUserIds = [];
+      if (operation === "detach" && instance.surface !== undefined) {
+        instance.surface.hasKeyboard = false;
+      } else if (operation === "delete") {
+        instance.surface = undefined;
+      }
       await this.repository.writeInstance(instance);
+      await Promise.allSettled([
+        this.surfaces.applyClose(api, surface, operation),
+        this.repository.deleteCallbacks(oldTokens),
+        ...focusedUserIds.map(userId => this.repository.deleteFocusIfOwned(
+          instance.chatId,
+          userId,
+          instance.id,
+          instance.threadId,
+        )),
+      ]);
       return;
     }
     await this.surfaces.rerender(api, instance, ctx);
@@ -447,84 +449,6 @@ export class DialogRuntime<
     return new StateHandle(instance.state, state => {
       instance.state = state;
     });
-  }
-
-  private async commitWithFocus(
-    instance: InstanceRecord,
-    userId: number | undefined,
-    commit: () => Promise<void>,
-  ): Promise<void> {
-    if (userId === undefined) {
-      await commit();
-      return;
-    }
-
-    const previousFocus = await this.repository.readFocus(
-      instance.chatId,
-      userId,
-      instance.threadId,
-    );
-    if (!instance.focusedUserIds.includes(userId)) instance.focusedUserIds.push(userId);
-    let focusChanged = false;
-
-    try {
-      if (previousFocus !== instance.id) {
-        await this.repository.writeFocus(
-          instance.chatId,
-          userId,
-          instance.id,
-          instance.threadId,
-        );
-        focusChanged = true;
-      }
-      await commit();
-    } catch (error) {
-      if (focusChanged) {
-        try {
-          await this.restoreFocus(instance, userId, previousFocus);
-        } catch (recoveryError) {
-          throw new AggregateError(
-            [error, recoveryError],
-            `Failed to restore focus for instance '${instance.id}'`,
-          );
-        }
-      }
-      throw error;
-    }
-  }
-
-  private async restoreFocus(
-    instance: InstanceRecord,
-    userId: number,
-    previousFocus: string | undefined,
-  ): Promise<void> {
-    if (previousFocus === undefined) {
-      await this.repository.deleteFocusIfOwned(
-        instance.chatId,
-        userId,
-        instance.id,
-        instance.threadId,
-      );
-      return;
-    }
-    await this.repository.writeFocus(
-      instance.chatId,
-      userId,
-      previousFocus,
-      instance.threadId,
-    );
-  }
-
-  private async clearFocus(instance: InstanceRecord): Promise<void> {
-    await Promise.all(instance.focusedUserIds.map(async userId => {
-      await this.repository.deleteFocusIfOwned(
-        instance.chatId,
-        userId,
-        instance.id,
-        instance.threadId,
-      );
-    }));
-    instance.focusedUserIds = [];
   }
 
   private messageThreadId(ctx: C): number | undefined {

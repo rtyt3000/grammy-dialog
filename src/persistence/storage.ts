@@ -1,5 +1,5 @@
 import type { StorageAdapter } from "grammy";
-import type { ButtonAction } from "./core.js";
+import type { ButtonAction, MediaKind } from "../core.js";
 
 export interface StackFrame {
   windowId: string;
@@ -9,7 +9,7 @@ export interface StackFrame {
 export interface SurfaceReference {
   chatId: number;
   messageId: number;
-  kind: "text" | "photo";
+  kind: "text" | MediaKind;
   hasKeyboard: boolean;
 }
 
@@ -46,7 +46,8 @@ export interface CallbackRecord {
 export type DialogStorageRecord =
   | { type: "instance"; version: 1; value: InstanceRecord }
   | { type: "callback"; version: 1; value: CallbackRecord }
-  | { type: "focus"; version: 1; value: { instanceId: string } };
+  | { type: "focus"; version: 1; value: { instanceId: string } }
+  | { type: "focus"; version: 2; value: { instanceIds: string[] } };
 
 export class MemoryStorageAdapter<T> implements StorageAdapter<T> {
   private readonly values = new Map<string, T>();

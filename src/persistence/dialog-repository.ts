@@ -50,8 +50,19 @@ export class DialogRepository {
     userId: number,
     threadId?: number,
   ): Promise<string | undefined> {
+    return (await this.readFocusIds(chatId, userId, threadId)).at(-1);
+  }
+
+  public async readFocusIds(
+    chatId: number,
+    userId: number,
+    threadId?: number,
+  ): Promise<string[]> {
     const record = await this.storage.read(storageKeys.focus(chatId, userId, threadId));
-    return record?.type === "focus" ? record.value.instanceId : undefined;
+    if (record?.type !== "focus") return [];
+    return record.version === 1
+      ? [record.value.instanceId]
+      : [...record.value.instanceIds];
   }
 
   public async writeFocus(
@@ -60,10 +71,30 @@ export class DialogRepository {
     instanceId: string,
     threadId?: number,
   ): Promise<void> {
-    await this.storage.write(storageKeys.focus(chatId, userId, threadId), {
+    const current = await this.readFocusIds(chatId, userId, threadId);
+    await this.writeFocusIds(
+      chatId,
+      userId,
+      [...current.filter(id => id !== instanceId), instanceId],
+      threadId,
+    );
+  }
+
+  public async writeFocusIds(
+    chatId: number,
+    userId: number,
+    instanceIds: ReadonlyArray<string>,
+    threadId?: number,
+  ): Promise<void> {
+    const key = storageKeys.focus(chatId, userId, threadId);
+    if (instanceIds.length === 0) {
+      await this.storage.delete(key);
+      return;
+    }
+    await this.storage.write(key, {
       type: "focus",
-      version: 1,
-      value: { instanceId },
+      version: 2,
+      value: { instanceIds: [...instanceIds] },
     });
   }
 
@@ -73,10 +104,13 @@ export class DialogRepository {
     instanceId: string,
     threadId?: number,
   ): Promise<void> {
-    const key = storageKeys.focus(chatId, userId, threadId);
-    const record = await this.storage.read(key);
-    if (record?.type === "focus" && record.value.instanceId === instanceId) {
-      await this.storage.delete(key);
-    }
+    const instanceIds = await this.readFocusIds(chatId, userId, threadId);
+    if (!instanceIds.includes(instanceId)) return;
+    await this.writeFocusIds(
+      chatId,
+      userId,
+      instanceIds.filter(id => id !== instanceId),
+      threadId,
+    );
   }
 }

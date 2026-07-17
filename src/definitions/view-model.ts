@@ -1,0 +1,89 @@
+import type { Context } from "grammy";
+import type { NavigationController } from "./actions.js";
+import type { Awaitable, StateHandle } from "./common.js";
+
+export interface ViewModelLoadContext<C extends Context, State, Services> {
+  readonly ctx: C | undefined;
+  readonly state: State;
+  readonly services: Services;
+  readonly actor: { id?: number; chatId: number };
+}
+
+export interface IntentContext<
+  C extends Context,
+  State,
+  View,
+  Services,
+  Payload = unknown,
+  Value = unknown,
+> {
+  readonly ctx: C;
+  readonly state: StateHandle<State>;
+  readonly vm: View;
+  readonly services: Services;
+  readonly navigation: NavigationController;
+  readonly payload: Payload;
+  readonly value: Value;
+}
+
+export type IntentHandler<
+  C extends Context = Context,
+  State = unknown,
+  View = unknown,
+  Services = unknown,
+> = (context: IntentContext<C, State, View, Services, any, any>) => Awaitable<void>;
+
+export interface ViewModelDefinition<
+  State = unknown,
+  View = unknown,
+  C extends Context = Context,
+  Services = unknown,
+  Intents extends Record<string, IntentHandler<C, State, View, Services>> = Record<
+    string,
+    IntentHandler<C, State, View, Services>
+  >,
+> {
+  readonly initialState: () => State;
+  readonly load: (context: ViewModelLoadContext<C, State, Services>) => Awaitable<View>;
+  readonly intents: Intents;
+}
+
+export function viewModel(): ViewModelDefinition<{}, {}, Context, unknown, {}>;
+export function viewModel<
+  State,
+  C extends Context = Context,
+  Services = unknown,
+  Intents extends Record<string, IntentHandler<C, State, State, Services>> = {},
+>(definition: {
+  initialState: State | (() => State);
+  load?: undefined;
+  intents?: Intents & Record<string, IntentHandler<C, State, State, Services>>;
+}): ViewModelDefinition<State, State, C, Services, Intents>;
+export function viewModel<
+  State,
+  View,
+  C extends Context = Context,
+  Services = unknown,
+  Intents extends Record<string, IntentHandler<C, State, View, Services>> = Record<
+    string,
+    IntentHandler<C, State, View, Services>
+  >,
+>(definition: {
+  initialState?: State | (() => State);
+  load: (context: ViewModelLoadContext<C, State, Services>) => Awaitable<View>;
+  intents?: Intents & Record<string, IntentHandler<C, State, View, Services>>;
+}): ViewModelDefinition<State, View, C, Services, Intents>;
+export function viewModel(definition: {
+  initialState?: unknown | (() => unknown);
+  load?: (context: ViewModelLoadContext<any, any, any>) => Awaitable<unknown>;
+  intents?: Record<string, IntentHandler<any, any, any, any>>;
+} = {}): ViewModelDefinition<any, any, any, any, any> {
+  const initialState = definition.initialState ?? {};
+  return {
+    initialState: typeof initialState === "function"
+      ? initialState as () => unknown
+      : () => structuredClone(initialState),
+    load: definition.load ?? (({ state }) => state),
+    intents: definition.intents ?? {},
+  };
+}

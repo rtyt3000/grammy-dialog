@@ -1,6 +1,6 @@
 import type { Context, InputFile } from "grammy";
-import type { InlineKeyboardMarkup } from "grammy/types";
-import type { CallbackCodec } from "./callbacks.js";
+import type { InlineKeyboardMarkup, ParseMode } from "grammy/types";
+import type { CallbackCodec } from "../callbacks/codec.js";
 import {
   type KeyboardNode,
   type KeyboardWidgetInstance,
@@ -9,14 +9,21 @@ import {
   type TextSource,
   type Translation,
   type TranslationAdapter,
-} from "./core.js";
-import type { AnyWindow, DefinitionRegistry } from "./registry.js";
-import type { DialogRepository } from "./repository.js";
-import type { CallbackRecord, InstanceRecord } from "./storage.js";
+} from "../core.js";
+import type { AnyWindow, DefinitionRegistry } from "./definition-registry.js";
+import type { DialogRepository } from "../persistence/dialog-repository.js";
+import type { CallbackRecord, InstanceRecord } from "../persistence/storage.js";
+import type { MediaKind } from "../core.js";
+
+export interface RenderedMedia {
+  kind: MediaKind;
+  source: string | InputFile;
+}
 
 export interface RenderedWindow {
   text: string;
-  photo?: string | InputFile;
+  parseMode?: ParseMode;
+  media?: RenderedMedia;
   replyMarkup?: InlineKeyboardMarkup;
   callbackTokens: string[];
 }
@@ -64,11 +71,14 @@ export class WindowRenderer<
       : typeof selectedWindow.media === "function"
         ? await selectedWindow.media(renderContext)
         : selectedWindow.media;
-    const photo = media === undefined
+    const mediaSource = media === undefined
       ? undefined
       : typeof media.source === "function"
         ? await media.source(renderContext)
         : media.source;
+    const renderedMedia = media === undefined || mediaSource === undefined
+      ? undefined
+      : { kind: media.kind, source: mediaSource };
     const keyboard = selectedWindow.keyboard === undefined
       ? []
       : typeof selectedWindow.keyboard === "function"
@@ -110,7 +120,8 @@ export class WindowRenderer<
 
     return {
       text,
-      photo,
+      parseMode: selectedWindow.parseMode,
+      media: renderedMedia,
       replyMarkup: inlineKeyboard.length === 0 ? undefined : { inline_keyboard: inlineKeyboard },
       callbackTokens,
     };
