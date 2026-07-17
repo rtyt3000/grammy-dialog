@@ -60,6 +60,7 @@ const edit = window("profile.edit", {
   ],
 });
 
+/** Member-scoped profile editor with localized text and text/photo inputs. */
 export const profileDialog = defineDialog({
   id: "profile",
   windows: { main, edit },

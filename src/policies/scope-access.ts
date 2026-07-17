@@ -6,13 +6,19 @@ function requireChat<C extends Context>(ctx: C): number {
   return ctx.chat.id;
 }
 
+/** Built-in factories for member, chat, topic, and custom scope strategies. */
 export interface ScopeStrategies {
+  /** Isolates instances by chat and user. This is the runtime default. */
   member<C extends Context = Context>(): ScopeStrategy<C>;
+  /** Shares an instance scope across the entire chat. */
   chat<C extends Context = Context>(): ScopeStrategy<C>;
+  /** Isolates instances by forum topic and rejects updates outside a topic. */
   topic<C extends Context = Context>(): ScopeStrategy<C>;
+  /** Uses an application-defined scope resolver. */
   custom<C extends Context = Context>(strategy: ScopeStrategy<C>): ScopeStrategy<C>;
 }
 
+/** Built-in dialog scope strategies. */
 export const scopes: ScopeStrategies = {
   member<C extends Context = Context>(): ScopeStrategy<C> {
     return {
@@ -52,12 +58,17 @@ export const scopes: ScopeStrategies = {
   },
 };
 
+/** Built-in factories for owner, shared, and custom access strategies. */
 export interface AccessStrategies {
+  /** Allows only the instance creator. This is the runtime default. */
   owner<C extends Context = Context>(): AccessStrategy<C>;
+  /** Allows every actor in the resolved scope. */
   everyone<C extends Context = Context>(): AccessStrategy<C>;
+  /** Uses an application-defined access predicate. */
   custom<C extends Context = Context>(strategy: AccessStrategy<C>): AccessStrategy<C>;
 }
 
+/** Built-in instance access strategies. */
 export const access: AccessStrategies = {
   owner<C extends Context = Context>(): AccessStrategy<C> {
     return {

@@ -54,6 +54,10 @@ import type {
   UiController,
 } from "./contracts.js";
 
+/**
+ * Stateful orchestration engine behind the grammY middleware.
+ * It may also be retained to show standalone windows outside incoming updates.
+ */
 export class DialogRuntime<
   C extends Context = Context,
   Services = unknown,
@@ -73,6 +77,7 @@ export class DialogRuntime<
   private readonly locks = new KeyedLocks();
   private readonly focus: FocusManager;
 
+  /** Creates a runtime and normalizes all storage, codec, locale, and policy defaults. */
   public constructor(options: DialogRuntimeOptions<C, Services>) {
     const storage = options.storage ?? new MemoryStorageAdapter<DialogStorageRecord>();
     this.repository = new DialogRepository(storage);
@@ -103,6 +108,7 @@ export class DialogRuntime<
     this.inputRouting = options.defaults?.inputRouting ?? inputRouting.latest<C>();
   }
 
+  /** Creates the `ctx.dialog` controller bound to an incoming update. */
   public controller(ctx: C): DialogController {
     return {
       start: (dialog, options) => this.start(ctx, dialog, options),
@@ -110,6 +116,7 @@ export class DialogRuntime<
     };
   }
 
+  /** Creates the `ctx.ui` controller bound to an incoming update. */
   public uiController(ctx: C): UiController {
     return {
       show: (window, options) => this.show(window, {
@@ -122,6 +129,7 @@ export class DialogRuntime<
     };
   }
 
+  /** Resolves scope and locale, persists, and mounts a new dialog instance. */
   public async start(
     ctx: C,
     dialogReference: string | DialogDefinition,
@@ -151,6 +159,7 @@ export class DialogRuntime<
     return { id: instance.id };
   }
 
+  /** Persists and mounts an independent standalone-window instance. */
   public async show(
     windowReference: string | WindowDefinition,
     options: ShowOptions,
@@ -181,6 +190,7 @@ export class DialogRuntime<
     return { id: instance.id };
   }
 
+  /** Handles a callback owned by this runtime and reports whether it was consumed. */
   public async handleCallback(ctx: C): Promise<boolean> {
     const data = ctx.callbackQuery?.data;
     if (data === undefined) return false;
@@ -200,6 +210,7 @@ export class DialogRuntime<
     return true;
   }
 
+  /** Routes an input to one focused instance and reports whether it was consumed. */
   public async handleInput(ctx: C): Promise<boolean> {
     if (ctx.chat === undefined || ctx.from === undefined || ctx.message === undefined) return false;
     const focusedInstanceIds = await this.repository.readFocusIds(
@@ -236,6 +247,7 @@ export class DialogRuntime<
     });
   }
 
+  /** Changes an active instance locale and immediately rerenders its current window. */
   public async setLocale(api: Api, instanceId: string, locale: string, ctx?: C): Promise<void> {
     await this.locks.run(instanceId, async () => {
       const instance = await this.repository.readInstance(instanceId);

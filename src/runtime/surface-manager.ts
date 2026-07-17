@@ -10,6 +10,7 @@ import type {
   PresentationOperation,
 } from "../presentation/contracts.js";
 
+/** Applies render results to Telegram with persistence-aware compensation. */
 export class SurfaceManager<
   C extends Context = Context,
   Services = unknown,
@@ -21,6 +22,7 @@ export class SurfaceManager<
     private readonly closeStrategy: CloseStrategy,
   ) {}
 
+  /** Sends and commits an instance's initial Telegram surface. */
   public async mount(api: Api, instance: InstanceRecord, ctx?: C): Promise<void> {
     const rendered = await this.renderer.render(instance, ctx);
     let messageId: number | undefined;
@@ -40,6 +42,7 @@ export class SurfaceManager<
     }
   }
 
+  /** Updates a mounted surface according to the presentation strategy. */
   public async rerender(api: Api, instance: InstanceRecord, ctx?: C): Promise<void> {
     if (instance.surface === undefined) throw new Error(`Instance '${instance.id}' has no surface`);
     const previous = await this.repository.readInstance(instance.id);
@@ -93,11 +96,13 @@ export class SurfaceManager<
     await this.ignoreFailure(() => this.repository.deleteCallbacks(previous.callbackTokens));
   }
 
+  /** Resolves the configured close operation for an instance surface. */
   public async planClose(instance: InstanceRecord): Promise<CloseOperation> {
     if (instance.surface === undefined) return "keep";
     return await this.closeStrategy.plan({ instance, surface: instance.surface });
   }
 
+  /** Applies a previously planned close operation to Telegram. */
   public async applyClose(
     api: Api,
     surface: SurfaceReference | undefined,

@@ -2,11 +2,13 @@ import type { InstanceRecord } from "../persistence/storage.js";
 import type { DialogRepository } from "../persistence/dialog-repository.js";
 import { KeyedLocks } from "./keyed-locks.js";
 
+/** Atomically coordinates focus-list persistence with an instance operation. */
 export class FocusManager {
   private readonly locks = new KeyedLocks();
 
   public constructor(private readonly repository: DialogRepository) {}
 
+  /** Adds focus before an operation and restores both records when it fails. */
   public async commit(
     instance: InstanceRecord,
     userId: number | undefined,

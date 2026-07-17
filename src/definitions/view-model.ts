@@ -2,6 +2,7 @@ import type { Context } from "grammy";
 import type { NavigationController } from "./actions.js";
 import type { Awaitable, StateHandle } from "./common.js";
 
+/** Read-only values available while loading a ViewModel view. */
 export interface ViewModelLoadContext<C extends Context, State, Services> {
   readonly ctx: C | undefined;
   readonly state: State;
@@ -9,6 +10,7 @@ export interface ViewModelLoadContext<C extends Context, State, Services> {
   readonly actor: { id?: number; chatId: number };
 }
 
+/** Values available to a ViewModel intent handler. */
 export interface IntentContext<
   C extends Context,
   State,
@@ -26,6 +28,7 @@ export interface IntentContext<
   readonly value: Value;
 }
 
+/** Handles a named user intent and may mutate state or navigate. */
 export type IntentHandler<
   C extends Context = Context,
   State = unknown,
@@ -33,6 +36,7 @@ export type IntentHandler<
   Services = unknown,
 > = (context: IntentContext<C, State, View, Services, any, any>) => Awaitable<void>;
 
+/** Runtime-normalized ViewModel definition used by a window. */
 export interface ViewModelDefinition<
   State = unknown,
   View = unknown,
@@ -48,7 +52,9 @@ export interface ViewModelDefinition<
   readonly intents: Intents;
 }
 
+/** Creates an empty identity ViewModel for a static or stateless window. */
 export function viewModel(): ViewModelDefinition<{}, {}, Context, unknown, {}>;
+/** Creates an identity ViewModel whose rendered view is its current state. */
 export function viewModel<
   State,
   C extends Context = Context,
@@ -59,6 +65,7 @@ export function viewModel<
   load?: undefined;
   intents?: Intents & Record<string, IntentHandler<C, State, State, Services>>;
 }): ViewModelDefinition<State, State, C, Services, Intents>;
+/** Creates a ViewModel with a custom asynchronous or synchronous view loader. */
 export function viewModel<
   State,
   View,

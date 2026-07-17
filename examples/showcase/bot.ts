@@ -16,6 +16,7 @@ import { services } from "./services.js";
 import { counterCard } from "./windows/counter-card.js";
 import { reportReadyWindow } from "./windows/report-ready.js";
 
+/** Creates a configured showcase bot without starting long polling. */
 export function createShowcaseBot(token: string) {
   const bot = new Bot<AppContext>(token);
   const plugin: DialogPlugin<AppContext, AppServices> = dialogs<AppContext, AppServices>({

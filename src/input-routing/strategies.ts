@@ -1,15 +1,21 @@
 import type { Context } from "grammy";
 import type { InputRoutingStrategy } from "./contracts.js";
 
+/** Factories for built-in and application-defined input routing strategies. */
 export interface InputRoutingStrategies {
+  /** Routes to the most recently focused instance. This is the runtime default. */
   latest<C extends Context = Context>(): InputRoutingStrategy<C>;
+  /** Routes to the earliest still-focused instance. */
   oldest<C extends Context = Context>(): InputRoutingStrategy<C>;
+  /** Routes by replied-to surface, then applies the configured fallback. */
   reply<C extends Context = Context>(options?: {
     fallback?: "latest" | "oldest" | "none";
   }): InputRoutingStrategy<C>;
+  /** Uses an application-defined routing strategy. */
   custom<C extends Context = Context>(strategy: InputRoutingStrategy<C>): InputRoutingStrategy<C>;
 }
 
+/** Built-in focused-input routing strategies. */
 export const inputRouting: InputRoutingStrategies = {
   latest: () => ({
     id: "latest",

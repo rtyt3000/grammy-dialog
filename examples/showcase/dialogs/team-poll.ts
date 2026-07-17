@@ -26,6 +26,7 @@ const main = window("team-poll.main", {
   keyboard: [[button("👍", "yes"), button("👎", "no")]],
 });
 
+/** Chat-scoped poll that permits interactions from every group member. */
 export const teamPollDialog = defineDialog({
   id: "team-poll",
   windows: { main },

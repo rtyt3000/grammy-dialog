@@ -5,6 +5,7 @@ import type {
   DialogRuntimeOptions,
 } from "../runtime/contracts.js";
 
+/** grammY middleware augmented with its reusable dialog runtime. */
 export type DialogPlugin<
   C extends Context = Context,
   Services = unknown,
@@ -12,6 +13,10 @@ export type DialogPlugin<
   readonly runtime: DialogRuntime<C, Services>;
 };
 
+/**
+ * Creates grammY middleware that installs `ctx.dialog` and `ctx.ui`, then routes
+ * callbacks and focused inputs before delegating unmatched updates downstream.
+ */
 export function dialogs<
   C extends Context = Context,
   Services = unknown,

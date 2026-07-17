@@ -6,16 +6,19 @@ import type {
 } from "./storage.js";
 import { storageKeys } from "./storage.js";
 
+/** Typed, version-aware persistence facade over a grammY storage adapter. */
 export class DialogRepository {
   public constructor(
     private readonly storage: StorageAdapter<DialogStorageRecord>,
   ) {}
 
+  /** Reads an instance snapshot. */
   public async readInstance(id: string): Promise<InstanceRecord | undefined> {
     const record = await this.storage.read(storageKeys.instance(id));
     return record?.type === "instance" ? structuredClone(record.value) : undefined;
   }
 
+  /** Persists a structural snapshot of an instance. */
   public async writeInstance(instance: InstanceRecord): Promise<void> {
     await this.storage.write(storageKeys.instance(instance.id), {
       type: "instance",
@@ -24,11 +27,13 @@ export class DialogRepository {
     });
   }
 
+  /** Reads a callback binding by its decoded token. */
   public async readCallback(token: string): Promise<CallbackRecord | undefined> {
     const record = await this.storage.read(storageKeys.callback(token));
     return record?.type === "callback" ? structuredClone(record.value) : undefined;
   }
 
+  /** Persists a structural snapshot of a callback binding. */
   public async writeCallback(token: string, callback: CallbackRecord): Promise<void> {
     await this.storage.write(storageKeys.callback(token), {
       type: "callback",
@@ -37,14 +42,17 @@ export class DialogRepository {
     });
   }
 
+  /** Deletes one callback binding. */
   public async deleteCallback(token: string): Promise<void> {
     await this.storage.delete(storageKeys.callback(token));
   }
 
+  /** Deletes callback bindings sequentially. */
   public async deleteCallbacks(tokens: ReadonlyArray<string>): Promise<void> {
     await Promise.all(tokens.map(token => this.deleteCallback(token)));
   }
 
+  /** Reads the latest focused instance for compatibility with single-focus callers. */
   public async readFocus(
     chatId: number,
     userId: number,
@@ -53,6 +61,7 @@ export class DialogRepository {
     return (await this.readFocusIds(chatId, userId, threadId)).at(-1);
   }
 
+  /** Reads the ordered list of focused instance ids, including legacy records. */
   public async readFocusIds(
     chatId: number,
     userId: number,
@@ -65,6 +74,7 @@ export class DialogRepository {
       : [...record.value.instanceIds];
   }
 
+  /** Adds an instance as the most recently focused item. */
   public async writeFocus(
     chatId: number,
     userId: number,
@@ -80,6 +90,7 @@ export class DialogRepository {
     );
   }
 
+  /** Replaces or removes the complete ordered focus list. */
   public async writeFocusIds(
     chatId: number,
     userId: number,
@@ -98,6 +109,7 @@ export class DialogRepository {
     });
   }
 
+  /** Removes an instance from focus without disturbing other active instances. */
   public async deleteFocusIfOwned(
     chatId: number,
     userId: number,

@@ -19,6 +19,7 @@ const translations: Record<string, Record<string, string>> = {
   },
 };
 
+/** In-memory translation adapter demonstrating the library's i18n boundary. */
 export const translationAdapter: TranslationAdapter = {
   translate(locale, key, params = {}) {
     const template = translations[locale]?.[key] ?? translations.en?.[key] ?? key;

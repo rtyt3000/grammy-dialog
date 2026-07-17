@@ -1,6 +1,7 @@
 import { button } from "@ppsh/grammy-dialog";
 import { defineKeyboardWidget } from "@ppsh/grammy-dialog/widgets";
 
+/** Stateful counter widget whose increment step defaults to one. */
 export const counterWidget = defineKeyboardWidget<{ step?: number }, number>()({
   state: {
     initial: () => 0,

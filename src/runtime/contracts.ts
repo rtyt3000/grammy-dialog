@@ -13,17 +13,26 @@ import type { InputRoutingStrategy } from "../input-routing/contracts.js";
 import type { DialogStorageRecord } from "../persistence/storage.js";
 import type { CloseStrategy, PresentationStrategy } from "../presentation/contracts.js";
 
+/** Configuration accepted by `dialogs()` and `DialogRuntime`. */
 export interface DialogRuntimeOptions<C extends Context = Context, Services = unknown> {
+  /** Dialogs and standalone windows registered by this runtime. */
   list: ReadonlyArray<DialogResource<C>>;
+  /** grammY storage adapter; defaults to an in-memory adapter. */
   storage?: StorageAdapter<DialogStorageRecord>;
+  /** Application dependencies exposed to ViewModels and renderers. */
   services?: Services;
+  /** Built-in callback codec options or a complete custom codec. */
   callbacks?: CallbackCodecOptions | CallbackCodec;
+  /** Optional translation adapter and initial locale resolver. */
   i18n?: {
     adapter: TranslationAdapter;
     locale?: LocaleResolver<C>;
   };
+  /** Locale used when none can be resolved; defaults to `en`. */
   defaultLocale?: string;
+  /** Callback record lifetime in milliseconds; defaults to seven days. */
   callbackTtlMs?: number;
+  /** Runtime policy defaults overridden by dialog or window definitions. */
   defaults?: {
     scope?: ScopeStrategy<C>;
     access?: AccessStrategy<C>;
@@ -33,11 +42,13 @@ export interface DialogRuntimeOptions<C extends Context = Context, Services = un
   };
 }
 
+/** Per-instance options accepted when starting a registered dialog. */
 export interface StartOptions {
   data?: unknown;
   locale?: string;
 }
 
+/** Address and actor overrides for showing a standalone window. */
 export interface ShowOptions extends StartOptions {
   chatId?: number;
   actorId?: number;
@@ -45,19 +56,26 @@ export interface ShowOptions extends StartOptions {
   api?: Api;
 }
 
+/** Stable reference returned after a dialog instance is mounted. */
 export interface InstanceHandle {
   readonly id: string;
 }
 
+/** Dialog operations installed on `ctx.dialog`. */
 export interface DialogController {
+  /** Starts and mounts a new dialog instance. */
   start(dialog: string | DialogDefinition, options?: StartOptions): Promise<InstanceHandle>;
+  /** Stores a locale and immediately rerenders the current window. */
   setLocale(instanceId: string, locale: string): Promise<void>;
 }
 
+/** Dialogless window operations installed on `ctx.ui`. */
 export interface UiController {
+  /** Creates and mounts an independent standalone-window instance. */
   show(window: string | WindowDefinition, options?: ShowOptions): Promise<InstanceHandle>;
 }
 
+/** grammY context flavor installed by the dialog middleware. */
 export interface DialogFlavor {
   dialog: DialogController;
   ui: UiController;

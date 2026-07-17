@@ -15,11 +15,13 @@ import type { DialogRepository } from "../persistence/dialog-repository.js";
 import type { CallbackRecord, InstanceRecord } from "../persistence/storage.js";
 import type { MediaKind } from "../core.js";
 
+/** Resolved media ready to pass to the Telegram Bot API. */
 export interface RenderedMedia {
   kind: MediaKind;
   source: string | InputFile;
 }
 
+/** Complete render result consumed by the surface manager. */
 export interface RenderedWindow {
   text: string;
   parseMode?: ParseMode;
@@ -28,6 +30,7 @@ export interface RenderedWindow {
   callbackTokens: string[];
 }
 
+/** Dependencies required to render windows and register their callbacks. */
 export interface WindowRendererOptions<
   C extends Context,
   Services,
@@ -40,6 +43,7 @@ export interface WindowRendererOptions<
   callbackTtlMs: number;
 }
 
+/** Resolves ViewModels, translations, media, keyboards, and widget state. */
 export class WindowRenderer<
   C extends Context = Context,
   Services = unknown,
@@ -60,6 +64,7 @@ export class WindowRenderer<
     this.callbackTtlMs = options.callbackTtlMs;
   }
 
+  /** Renders the current stack window and persists generated callback bindings. */
   public async render(instance: InstanceRecord, ctx?: C): Promise<RenderedWindow> {
     const selectedWindow = this.registry.currentWindow(instance);
     const renderContext = await this.createContext(instance, selectedWindow, ctx);
@@ -127,6 +132,7 @@ export class WindowRenderer<
     };
   }
 
+  /** Loads a ViewModel and constructs its render context. */
   public async createContext(
     instance: InstanceRecord,
     selectedWindow: AnyWindow<C>,
@@ -148,6 +154,7 @@ export class WindowRenderer<
     };
   }
 
+  /** Resolves static, functional, or translated text. */
   public async resolveText(
     source: TextSource<C, any, Services>,
     context: RenderContext<C, any, Services>,
@@ -158,6 +165,7 @@ export class WindowRenderer<
       : value;
   }
 
+  /** Returns a mutable handle and initializes or resets versioned widget state. */
   public widgetState(
     instance: InstanceRecord,
     widget: KeyboardWidgetInstance<C, any, Services, any, any>,
@@ -178,6 +186,7 @@ export class WindowRenderer<
     });
   }
 
+  /** Narrows a keyboard node to a mounted stateful widget. */
   public isKeyboardWidget(
     node: KeyboardNode<C, any, Services>,
   ): node is KeyboardWidgetInstance<C, any, Services, any, any> {

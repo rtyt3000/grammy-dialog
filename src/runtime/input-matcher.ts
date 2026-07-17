@@ -4,13 +4,16 @@ import type {
   TextSource,
 } from "../core.js";
 
+/** Intent dispatch or validation failure produced by input matching. */
 export interface MatchedInput {
   intent: string;
   value?: unknown;
   failure?: TextSource;
 }
 
+/** Matches grammY messages against built-in and custom input definitions. */
 export class InputMatcher<C extends Context = Context> {
+  /** Returns the first matching normalized input, or `undefined`. */
   public async match(
     ctx: C,
     inputs: ReadonlyArray<InputDefinition<C>>,

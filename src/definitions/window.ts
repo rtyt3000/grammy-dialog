@@ -7,6 +7,7 @@ import type { AccessStrategy, ScopeStrategy } from "./policies.js";
 import type { TextSource } from "./rendering.js";
 import { viewModel, type ViewModelDefinition } from "./view-model.js";
 
+/** Declarative definition of one renderable Telegram surface. */
 export interface WindowDefinition<
   C extends Context = Context,
   State = unknown,
@@ -25,6 +26,7 @@ export interface WindowDefinition<
   readonly access?: AccessStrategy<C>;
 }
 
+/** Creates a window backed by an explicit ViewModel. */
 export function window<
   C extends Context = Context,
   State = unknown,
@@ -34,6 +36,7 @@ export function window<
   id: string,
   definition: Omit<WindowDefinition<C, State, View, Services>, "kind" | "id">,
 ): WindowDefinition<C, State, View, Services>;
+/** Creates a static window with an automatically supplied empty ViewModel. */
 export function window<C extends Context = Context, Services = unknown>(
   id: string,
   definition: Omit<WindowDefinition<C, {}, {}, Services>, "kind" | "id" | "viewModel"> & {
@@ -49,6 +52,7 @@ export function window(
   return { kind: "window", id, ...definition, viewModel: definition.viewModel ?? viewModel() };
 }
 
+/** Declarative group of windows sharing one navigation stack. */
 export interface DialogDefinition<C extends Context = Context> {
   readonly kind: "dialog";
   readonly id: string;
@@ -58,6 +62,12 @@ export interface DialogDefinition<C extends Context = Context> {
   readonly access?: AccessStrategy<C>;
 }
 
+/**
+ * Creates a dialog definition.
+ *
+ * When `initial` is omitted, the first key in `windows` is used.
+ * @throws When no initial window can be resolved.
+ */
 export function defineDialog<C extends Context = Context>(definition: {
   id: string;
   initial?: string;
@@ -72,6 +82,7 @@ export function defineDialog<C extends Context = Context>(definition: {
   return { kind: "dialog", ...definition, initial };
 }
 
+/** A full dialog or a standalone window accepted by the runtime registry. */
 export type DialogResource<C extends Context = Context> =
   | DialogDefinition<C>
   | WindowDefinition<C, any, any, any>;

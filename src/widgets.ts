@@ -13,12 +13,14 @@ import type {
   WidgetActionHandler,
 } from "./core.js";
 
+/** Curried factory used to define a reusable text widget with typed props. */
 export interface TextWidgetFactory<Props> {
   <C extends Context = Context, View = unknown, Services = unknown>(definition: {
     render(context: RenderContext<C, View, Services> & { readonly props: Props }): Awaitable<string>;
   }): (props: Props) => TextSource<C, View, Services>;
 }
 
+/** Starts definition of a reusable render-only text widget. */
 export function defineTextWidget<Props>(): TextWidgetFactory<Props> {
   return (function define<
     C extends Context = Context,
@@ -32,6 +34,7 @@ export function defineTextWidget<Props>(): TextWidgetFactory<Props> {
   }) as TextWidgetFactory<Props>;
 }
 
+/** Curried factory used to define a reusable media widget with typed props. */
 export interface MediaWidgetFactory<Props> {
   <C extends Context = Context, View = unknown, Services = unknown>(definition: {
     render(
@@ -44,6 +47,7 @@ export interface MediaWidgetFactory<Props> {
   ) => Awaitable<MediaDefinition<MediaKind, C, View, Services> | undefined>;
 }
 
+/** Starts definition of a media widget that may omit media for a render. */
 export function defineMediaWidget<Props>(): MediaWidgetFactory<Props> {
   return function define<
     C extends Context = Context,
@@ -59,6 +63,7 @@ export function defineMediaWidget<Props>(): MediaWidgetFactory<Props> {
   };
 }
 
+/** Curried factory used to define a custom input parser with typed props and value. */
 export interface InputWidgetFactory<Props, Value> {
   <C extends Context = Context>(definition: {
     match(ctx: C, props: Props): Awaitable<boolean>;
@@ -69,6 +74,10 @@ export interface InputWidgetFactory<Props, Value> {
   ) => CustomInputDefinition<C, Value>;
 }
 
+/**
+ * Starts definition of a custom input widget.
+ * Mounted inputs use their `id` as `onReceive` unless it is overridden.
+ */
 export function defineInputWidget<Props, Value>(): InputWidgetFactory<Props, Value> {
   return function define<C extends Context = Context>(definition: {
     match(ctx: C, props: Props): Awaitable<boolean>;
@@ -94,6 +103,7 @@ export function defineInputWidget<Props, Value>(): InputWidgetFactory<Props, Val
   };
 }
 
+/** Curried factory used to define a stateful keyboard widget. */
 export interface KeyboardWidgetFactory<Props, State> {
   <
     C extends Context = Context,
@@ -110,6 +120,10 @@ export interface KeyboardWidgetFactory<Props, State> {
   ) => KeyboardWidgetInstance<C, View, Services, Props, State>;
 }
 
+/**
+ * Starts definition of a stateful keyboard widget.
+ * Widget state is isolated by the mounted `id`; its schema version defaults to `1`.
+ */
 export function defineKeyboardWidget<Props, State>(): KeyboardWidgetFactory<Props, State> {
   return (function define<
     C extends Context = Context,
@@ -142,6 +156,7 @@ export function defineKeyboardWidget<Props, State>(): KeyboardWidgetFactory<Prop
   }) as KeyboardWidgetFactory<Props, State>;
 }
 
+/** Curried factory used to define a reusable stateless keyboard layout. */
 export interface KeyboardLayoutFactory<Props> {
   <C extends Context = Context, View = unknown, Services = unknown>(definition: {
     render(
@@ -154,6 +169,7 @@ export interface KeyboardLayoutFactory<Props> {
   ) => Awaitable<KeyboardDefinition<C, View, Services>>;
 }
 
+/** Starts definition of a stateless inline keyboard layout. */
 export function defineKeyboardLayout<Props>(): KeyboardLayoutFactory<Props> {
   return function define<
     C extends Context = Context,

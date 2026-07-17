@@ -3,11 +3,17 @@ import type {
   PresentationStrategy,
 } from "./contracts.js";
 
+/** Factories for built-in and application-defined presentation strategies. */
 export interface PresentationStrategies {
+  /** Edits compatible surfaces and replaces incompatible or uneditable ones. */
   auto(): PresentationStrategy;
+  /** Prefers editing and optionally replaces the surface after an edit failure. */
   edit(options?: { fallback?: "replace" | "throw" }): PresentationStrategy;
+  /** Sends a replacement and removes the previous surface. */
   replace(): PresentationStrategy;
+  /** Sends a new surface while retaining the previous message without callbacks. */
   send(): PresentationStrategy;
+  /** Uses an application-defined presentation planner. */
   custom(strategy: PresentationStrategy): PresentationStrategy;
 }
 
@@ -23,6 +29,7 @@ function telegramDescription(error: unknown): string {
   return description.toLowerCase();
 }
 
+/** Returns whether a Telegram edit error is safe to recover through replacement. */
 export function isRecoverableEditError(error: unknown): boolean {
   const description = telegramDescription(error);
   return description.includes("message to edit not found") ||
@@ -35,6 +42,7 @@ function canEditInPlace(current: string, next: string): boolean {
   return current !== "voice" && next !== "voice";
 }
 
+/** Built-in surface presentation strategies. */
 export const presentations: PresentationStrategies = {
   auto() {
     return {
@@ -61,13 +69,19 @@ export const presentations: PresentationStrategies = {
   },
 };
 
+/** Factories for built-in and application-defined close strategies. */
 export interface CloseStrategies {
+  /** Leaves the final surface untouched. */
   keep(): CloseStrategy;
+  /** Removes callbacks but keeps the message. This is the runtime default. */
   detach(): CloseStrategy;
+  /** Deletes the final Telegram message. */
   delete(): CloseStrategy;
+  /** Uses an application-defined close planner. */
   custom(strategy: CloseStrategy): CloseStrategy;
 }
 
+/** Built-in instance close strategies. */
 export const closeStrategies: CloseStrategies = {
   keep: () => ({ id: "keep", plan: () => "keep" }),
   detach: () => ({ id: "detach", plan: () => "detach" }),

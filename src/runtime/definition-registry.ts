@@ -6,8 +6,10 @@ import type {
 } from "../core.js";
 import type { InstanceRecord } from "../persistence/storage.js";
 
+/** Window definition with erased state, view, and service parameters. */
 export type AnyWindow<C extends Context> = WindowDefinition<C, any, any, any>;
 
+/** Resolves registered dialogs, standalone windows, and dialog-local aliases. */
 export class DefinitionRegistry<C extends Context = Context> {
   private readonly dialogs = new Map<string, DialogDefinition<C>>();
   private readonly windows = new Map<string, AnyWindow<C>>();
@@ -16,6 +18,7 @@ export class DefinitionRegistry<C extends Context = Context> {
     this.register(resources);
   }
 
+  /** Resolves a dialog id or returns the supplied definition. */
   public dialog(reference: string | DialogDefinition): DialogDefinition<C> {
     const id = typeof reference === "string" ? reference : reference.id;
     const dialog = this.dialogs.get(id);
@@ -23,10 +26,12 @@ export class DefinitionRegistry<C extends Context = Context> {
     return dialog;
   }
 
+  /** Finds a dialog without throwing when it is not registered. */
   public findDialog(id: string): DialogDefinition<C> | undefined {
     return this.dialogs.get(id);
   }
 
+  /** Resolves a window id or returns the supplied definition. */
   public window(reference: string | WindowDefinition): AnyWindow<C> {
     const id = typeof reference === "string" ? reference : reference.id;
     const selectedWindow = this.windows.get(id);
@@ -34,18 +39,21 @@ export class DefinitionRegistry<C extends Context = Context> {
     return selectedWindow;
   }
 
+  /** Resolves the window at the top of an instance navigation stack. */
   public currentWindow(instance: InstanceRecord): AnyWindow<C> {
     const frame = instance.stack[instance.stack.length - 1];
     if (frame === undefined) throw new Error(`Instance '${instance.id}' has an empty stack`);
     return this.window(frame.windowId);
   }
 
+  /** Resolves a window reference relative to an instance's dialog definition. */
   public resolveForInstance(instance: InstanceRecord, reference: string): string {
     if (instance.kind !== "dialog") return reference;
     const dialog = this.dialogs.get(instance.definitionId);
     return dialog === undefined ? reference : this.resolveDialogWindow(dialog, reference);
   }
 
+  /** Resolves either a dialog-local key or a globally registered window id. */
   public resolveDialogWindow(dialog: DialogDefinition<C>, reference: string): string {
     return dialog.windows[reference]?.id ?? reference;
   }
