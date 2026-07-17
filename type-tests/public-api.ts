@@ -103,10 +103,14 @@ window("profile.invalid", {
   text: ({ vm }) => vm.missingProperty,
 });
 
-defineDialog({
+const profileDialog = defineDialog({
   id: "profile",
   windows: { main: profileWindow },
 });
+
+declare const botContext: BotContext;
+botContext.dialog.start(profileDialog);
+botContext.ui.show(profileWindow);
 
 intent<{ userId: number }>("open-user", { userId: 42 });
 // @ts-expect-error A typed intent payload is required.

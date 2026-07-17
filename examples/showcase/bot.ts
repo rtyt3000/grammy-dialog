@@ -37,10 +37,10 @@ export function createShowcaseBot(token: string) {
   });
 
   bot.use(plugin);
-  bot.command("profile", ctx => ctx.dialog.start("profile"));
-  bot.command("poll", ctx => ctx.dialog.start("team-poll"));
-  bot.command("counter", ctx => ctx.ui.show("counter-card"));
-  bot.command("report", ctx => ctx.ui.show("report-ready"));
+  bot.command("profile", ctx => ctx.dialog.start(profileDialog));
+  bot.command("poll", ctx => ctx.dialog.start(teamPollDialog));
+  bot.command("counter", ctx => ctx.ui.show(counterCard));
+  bot.command("report", ctx => ctx.ui.show(reportReadyWindow));
 
   return { bot, dialogs: plugin };
 }

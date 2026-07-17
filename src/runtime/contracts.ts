@@ -64,7 +64,7 @@ export interface InstanceHandle {
 /** Dialog operations installed on `ctx.dialog`. */
 export interface DialogController {
   /** Starts and mounts a new dialog instance. */
-  start(dialog: string | DialogDefinition, options?: StartOptions): Promise<InstanceHandle>;
+  start(dialog: string | DialogDefinition<any>, options?: StartOptions): Promise<InstanceHandle>;
   /** Stores a locale and immediately rerenders the current window. */
   setLocale(instanceId: string, locale: string): Promise<void>;
 }
@@ -72,7 +72,10 @@ export interface DialogController {
 /** Dialogless window operations installed on `ctx.ui`. */
 export interface UiController {
   /** Creates and mounts an independent standalone-window instance. */
-  show(window: string | WindowDefinition, options?: ShowOptions): Promise<InstanceHandle>;
+  show(
+    window: string | WindowDefinition<any, any, any, any>,
+    options?: ShowOptions,
+  ): Promise<InstanceHandle>;
 }
 
 /** grammY context flavor installed by the dialog middleware. */
