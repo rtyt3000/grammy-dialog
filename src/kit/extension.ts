@@ -1,6 +1,9 @@
 import type { Context } from "grammy";
 import { createViewModelFactory, window } from "../core.js";
-import { builtInWidgets, type BuiltInWidgetCatalog } from "./built-in-widgets.js";
+import {
+  builtInUi,
+  type BuiltInUiCatalog,
+} from "./built-in-widgets.js";
 import type {
   DialogCatalog,
   DialogExtension,
@@ -15,23 +18,27 @@ import {
   type WidgetDefinitionDsl,
   type WindowFactory,
 } from "./definition-dsl.js";
+import { access, scopes } from "../policies/scope-access.js";
 
 /** DSL exposed to context-independent third-party extension definitions. */
 export interface StandaloneExtensionContext extends DialogDefinitionDsl<
   Context,
   unknown,
-  BuiltInWidgetCatalog
+  {}
 > {
-  /** Built-in widgets available to every kit. */
-  readonly widgets: BuiltInWidgetCatalog;
-  /** Low-level factories for defining additional widgets. */
-  readonly define: WidgetDefinitionDsl;
+  /** Previously installed custom widgets; standalone extensions start empty. */
+  readonly widgets: {};
+  readonly ui: BuiltInUiCatalog;
+  readonly scope: typeof scopes;
+  readonly access: typeof access;
+  /** Factories for defining additional widgets. */
+  readonly widget: WidgetDefinitionDsl["widget"];
 }
 
 /**
  * Defines a context-independent extension, typically in a third-party package.
  * Application-specific reusable plugins may use `kit.extension()` to receive the
- * application's types. Ordinary dialogs and windows should use `kit.compose()`.
+ * application's types. Ordinary dialogs and windows should use `kit.define()`.
  */
 export function defineDialogExtension<
   Widgets extends WidgetCatalog = {},
@@ -47,12 +54,15 @@ export function defineDialogExtension<
     viewModel: createViewModelFactory<Context, unknown>(),
     window: window as WindowFactory<Context, unknown>,
     dialog: createDialogFactory(
-      createViewModelFactory<Context, unknown>(),
       window as WindowFactory<Context, unknown>,
-      builtInWidgets,
+      Object.freeze({}),
+      builtInUi,
     ),
-    widgets: builtInWidgets,
-    define: widgetDefinitionDsl,
+    widgets: Object.freeze({}),
+    ui: builtInUi,
+    scope: scopes,
+    access,
+    widget: widgetDefinitionDsl.widget,
   };
   return Object.freeze({
     name: options.name,

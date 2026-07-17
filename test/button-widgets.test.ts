@@ -7,7 +7,7 @@ import {
   intentButton,
   replaceButton,
   resetButton,
-} from "../src/index.js";
+} from "../src/internal.js";
 
 describe("semantic button widgets", () => {
   test("create intent and navigation actions", () => {
@@ -25,11 +25,11 @@ describe("semantic button widgets", () => {
   });
 
   test("exposes aiogram-style names through the kit widget catalog", () => {
-    const widgets = createDialogKit().widgets;
+    const buttons = createDialogKit().ui.button;
 
-    expect(widgets.back("Back").action.kind).toBe("back");
-    expect(widgets.switchTo("Switch", "next").action.kind).toBe("replace");
-    expect(widgets.cancel("Cancel").action.kind).toBe("close");
-    expect(widgets.url("Docs", "https://example.com").kind).toBe("url");
+    expect(buttons.back("Back").action.kind).toBe("back");
+    expect(buttons.replace("Switch", "next").action.kind).toBe("replace");
+    expect(buttons.close("Cancel").action.kind).toBe("close");
+    expect(buttons.url("Docs", "https://example.com").kind).toBe("url");
   });
 });

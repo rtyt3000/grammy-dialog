@@ -12,7 +12,7 @@ import {
   valid,
   viewModel,
   window,
-} from "../src/index.js";
+} from "../src/internal.js";
 import type { TestContext } from "./helpers.js";
 
 describe("navigation and input", () => {
@@ -41,7 +41,12 @@ describe("navigation and input", () => {
         onReceive: "saveName",
       })],
     });
-    const form = defineDialog({ id: "form", initial: "main", windows: { main, edit } });
+    const form = defineDialog({
+      id: "form",
+      initial: "main",
+      viewModel: formVm,
+      windows: { main, edit },
+    });
     const bot = new Bot<TestContext>("test-token");
     bot.use(dialogs<TestContext>({ list: [form] }));
     bot.command("form", ctx => ctx.dialog.start("form"));
@@ -72,7 +77,7 @@ describe("navigation and input", () => {
     const inputWindow = window("custom-input", {
       viewModel: vm,
       text: ({ vm }) => `Tag: ${vm.tag}`,
-      input: [hashtagInput({ id: "hashtag", onReceive: "setTag" })],
+      input: [hashtagInput("hashtag", vm.actions.setTag, {})],
     });
     const bot = new Bot<TestContext>("test-token");
     bot.use(dialogs<TestContext>({ list: [inputWindow] }));
@@ -83,5 +88,28 @@ describe("navigation and input", () => {
     await user.sendCommand("input");
     await user.sendText("#typescript");
     expect(chats.editsFor(user).lastOrThrow().text).toBe("Tag: typescript");
+  });
+
+  test("enforces the configured stack depth limit", async () => {
+    const vm = viewModel({ initialState: {} });
+    const main = window("limited.main", {
+      viewModel: vm,
+      text: "Limited",
+      keyboard: [[button("Push", go("main"))]],
+    });
+    const limited = defineDialog({
+      id: "limited",
+      viewModel: vm,
+      windows: { main },
+    });
+    const bot = new Bot<TestContext>("test-token");
+    bot.use(dialogs<TestContext>({ list: [limited], maxStackDepth: 1 }));
+    bot.command("limited", ctx => ctx.dialog.start(limited));
+    const { chats } = await prepareBot(bot);
+    const user = chats.newUser();
+    await user.sendCommand("limited");
+
+    await expect(user.replies.lastOrThrow().clickButton("Push"))
+      .rejects.toThrow("exceeded the stack depth limit of 1");
   });
 });

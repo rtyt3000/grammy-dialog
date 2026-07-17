@@ -1,9 +1,18 @@
-import type { PhotoInputValue } from "@ppsh/grammy-dialog";
-import { dialogDsl } from "../../app-types.js";
+import type { IntentContext, PhotoInputValue } from "@ppsh/grammy-dialog";
+import {
+  dialogDsl,
+  type AppContext,
+  type AppServices,
+} from "../../app-types.js";
 
 /** State persisted for the profile dialog instance. */
 export interface ProfileState {
   name?: string;
+  photoFileId?: string;
+}
+
+export interface ProfileView {
+  name: string;
   photoFileId?: string;
 }
 
@@ -17,13 +26,26 @@ export const profileViewModel = dialogDsl.viewModel({
     };
   },
   intents: {
-    saveName({ state, value, navigation }) {
-      state.update(current => ({ ...current, name: String(value) }));
+    saveName({ state, value, navigation }: IntentContext<
+      AppContext,
+      ProfileState,
+      ProfileView,
+      AppServices,
+      undefined,
+      string
+    >) {
+      state.update(current => ({ ...current, name: value }));
       navigation.back();
     },
-    savePhoto({ state, value, navigation }) {
-      const received = value as PhotoInputValue;
-      state.update(current => ({ ...current, photoFileId: received.fileId }));
+    savePhoto({ state, value, navigation }: IntentContext<
+      AppContext,
+      ProfileState,
+      ProfileView,
+      AppServices,
+      undefined,
+      PhotoInputValue
+    >) {
+      state.update(current => ({ ...current, photoFileId: value.fileId }));
       navigation.back();
     },
   },

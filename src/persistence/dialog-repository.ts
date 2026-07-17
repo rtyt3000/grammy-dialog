@@ -52,6 +52,44 @@ export class DialogRepository {
     await Promise.all(tokens.map(token => this.deleteCallback(token)));
   }
 
+  /** Reads the instance currently occupying a definition key within a scope. */
+  public async readIdentity(
+    scopeKey: string,
+    definitionId: string,
+    key: string,
+  ): Promise<string | undefined> {
+    const record = await this.storage.read(storageKeys.identity(scopeKey, definitionId, key));
+    return record?.type === "identity" ? record.value.instanceId : undefined;
+  }
+
+  /** Claims a definition key within a scope for an instance. */
+  public async writeIdentity(
+    scopeKey: string,
+    definitionId: string,
+    key: string,
+    instanceId: string,
+  ): Promise<void> {
+    await this.storage.write(storageKeys.identity(scopeKey, definitionId, key), {
+      type: "identity",
+      version: 1,
+      value: { instanceId },
+    });
+  }
+
+  /** Releases a definition key only when it is still owned by the expected instance. */
+  public async deleteIdentityIfOwned(
+    scopeKey: string,
+    definitionId: string,
+    key: string,
+    instanceId: string,
+  ): Promise<void> {
+    const storageKey = storageKeys.identity(scopeKey, definitionId, key);
+    const record = await this.storage.read(storageKey);
+    if (record?.type === "identity" && record.value.instanceId === instanceId) {
+      await this.storage.delete(storageKey);
+    }
+  }
+
   /** Reads the latest focused instance for compatibility with single-focus callers. */
   public async readFocus(
     chatId: number,

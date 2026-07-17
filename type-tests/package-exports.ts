@@ -1,45 +1,38 @@
 import {
-  button,
   createDialogKit,
   defineDialogExtension,
-  dialogs,
   MemoryStorageAdapter,
-  window,
   type DialogStorageRecord,
 } from "@ppsh/grammy-dialog";
-import { defineKeyboardWidget } from "@ppsh/grammy-dialog/widgets";
 
-const widget = defineKeyboardWidget<{}, number>()({
-  state: { initial: () => 0 },
-  actions: { increment({ state }) { state.update(value => value + 1); } },
-  render: ({ state, actions }) => [[button(String(state.value), actions.increment())]],
+const counterExtension = defineDialogExtension(({ widget, ui }) => {
+  const counter = widget.keyboard({
+    state: { initial: (_props: {}) => 0 },
+    actions: { increment({ state }) { state.update(value => value + 1); } },
+    render: ({ state, actions }) => [[
+      ui.button.raw(String(state.value), actions.increment()),
+    ]],
+  });
+  return { widgets: { counter } };
 });
 
-const exportedWindow = window("package-smoke", {
-  text: "Package smoke",
-  parseMode: "HTML",
-  keyboard: widget({ id: "counter" }),
+const builder = createDialogKit().use(counterExtension);
+const nested = builder.dialog("nested", {
+  viewModel: builder.viewModel({ initialState: {} }),
+  windows: ({ window, ui, widgets }) => ({
+    main: window("main", {
+      text: "Nested",
+      keyboard: ui.keyboard.compose(
+        widgets.counter("first", {}),
+        widgets.counter("second", {}),
+      ),
+    }),
+  }),
 });
+const notice = builder.window("notice", { text: "Notice" });
+const app = builder.define(() => ({ nested, notice }));
 
-dialogs({
-  list: [exportedWindow],
-  storage: new MemoryStorageAdapter<DialogStorageRecord>(),
-});
-
-const extension = defineDialogExtension(() => ({
-  widgets: { badge: (text: string) => `Badge: ${text}` },
-}));
-const dsl = createDialogKit().use(extension);
-const notice = dsl.window("notice", { text: "Notice" });
-const nested = dsl.dialog("nested", ({ window }) => ({
-  windows: { main: window("main", { text: "Nested" }) },
-}));
-const kit = dsl.compose(() => ({ notice, nested }));
-kit.widgets.badge("ready");
-kit.widgets.intent("Save", "save");
-kit.widgets.back("Back");
-kit.widgets.switchTo("Next", "next");
-kit.widgets.cancel("Cancel");
-kit.dialogs.nested;
-kit.windows.notice;
-kit.middleware({});
+app.middleware({ storage: new MemoryStorageAdapter<DialogStorageRecord>() });
+app.ui.media.photo("file-id");
+app.dialogs.nested;
+app.windows.notice;

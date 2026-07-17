@@ -1,11 +1,10 @@
 import type { Context } from "grammy";
 import {
-  button,
   defineDialog,
-  urlButton,
   type DialogDefinition,
   type AccessStrategy,
   type ScopeStrategy,
+  type ViewModelDefinition,
   type ViewModelFactory,
   type WindowDefinition,
 } from "../core.js";
@@ -16,11 +15,10 @@ import {
   defineMediaWidget,
   defineTextWidget,
 } from "../widgets.js";
+import type { BuiltInUiCatalog } from "./built-in-widgets.js";
 
 /** Low-level constructors available to extension authors. */
 export interface WidgetDefinitionDsl {
-  readonly button: typeof button;
-  readonly urlButton: typeof urlButton;
   readonly widget: {
     readonly text: typeof defineTextWidget;
     readonly media: typeof defineMediaWidget;
@@ -48,25 +46,28 @@ export interface WindowFactory<C extends Context, Services> {
   ): WindowDefinition<C, {}, {}, Services>;
 }
 
-/** Factories available while defining the contents of one dialog. */
-export interface DialogBuilderContext<
+/** Creates a dialog-local window bound to the dialog's ViewModel. */
+export interface DialogWindowFactory<C extends Context, State, View, Services> {
+  (
+    id: string,
+    definition: Omit<
+      WindowDefinition<C, State, View, Services>,
+      "kind" | "id" | "viewModel"
+    >,
+  ): WindowDefinition<C, State, View, Services>;
+}
+
+/** Values available while declaring windows owned by one dialog. */
+export interface DialogWindowsContext<
   C extends Context,
+  State,
+  View,
   Services,
   Widgets extends Readonly<Record<string, unknown>>,
 > {
-  readonly viewModel: ViewModelFactory<C, Services>;
-  /** Creates a window whose runtime id is automatically prefixed by the dialog id. */
-  readonly window: WindowFactory<C, Services>;
-  /** Built-in and installed third-party widgets available to this dialog. */
+  readonly window: DialogWindowFactory<C, State, View, Services>;
   readonly widgets: Widgets;
-}
-
-/** Result returned by a nested dialog builder. */
-export interface DialogBuilderResult<C extends Context> {
-  readonly initial?: string;
-  readonly windows: Readonly<Record<string, WindowDefinition<C, any, any, any>>>;
-  readonly scope?: ScopeStrategy<C>;
-  readonly access?: AccessStrategy<C>;
+  readonly ui: BuiltInUiCatalog;
 }
 
 /** Context-bound dialog factory exposed by a DialogKit. */
@@ -75,20 +76,20 @@ export interface DialogFactory<
   Services,
   Widgets extends Readonly<Record<string, unknown>>,
 > {
-  /** Creates a dialog with nested ViewModel and local-window factories. */
-  (
+  /** Creates a dialog with one ViewModel shared by all of its windows. */
+  <State, View>(
     id: string,
-    builder: (context: DialogBuilderContext<C, Services, Widgets>) => DialogBuilderResult<C>,
-  ): DialogDefinition<C>;
+    definition: {
+      readonly viewModel: ViewModelDefinition<State, View, C, Services>;
+      readonly windows: (
+        context: DialogWindowsContext<C, State, View, Services, Widgets>,
+      ) => Readonly<Record<string, WindowDefinition<C, State, View, Services>>>;
+      readonly initial?: string;
+      readonly scope?: ScopeStrategy<C>;
+      readonly access?: AccessStrategy<C>;
+    },
+  ): DialogDefinition<C, State, View, Services>;
 
-  /** Creates a dialog from an already assembled definition. */
-  (definition: {
-    id: string;
-    initial?: string;
-    windows: Readonly<Record<string, WindowDefinition<C, any, any, any>>>;
-    scope?: DialogDefinition<C>["scope"];
-    access?: DialogDefinition<C>["access"];
-  }): DialogDefinition<C>;
 }
 
 /** Application-bound factories used to define ViewModels and resources. */
@@ -108,31 +109,42 @@ export function createDialogFactory<
   Services,
   Widgets extends Readonly<Record<string, unknown>>,
 >(
-  viewModel: ViewModelFactory<C, Services>,
   windowFactory: WindowFactory<C, Services>,
   widgets: Widgets,
+  ui: BuiltInUiCatalog,
 ): DialogFactory<C, Services, Widgets> {
   return ((
-    definitionOrId: string | Parameters<typeof defineDialog>[0],
-    builder?: (
-      context: DialogBuilderContext<C, Services, Widgets>,
-    ) => DialogBuilderResult<C>,
+    definitionOrId: string,
+    builder?: {
+      readonly viewModel: ViewModelDefinition<any, any, C, Services>;
+      readonly windows: (
+        context: DialogWindowsContext<C, any, any, Services, Widgets>,
+      ) => Readonly<Record<string, WindowDefinition<C, any, any, Services>>>;
+      readonly initial?: string;
+      readonly scope?: ScopeStrategy<C>;
+      readonly access?: AccessStrategy<C>;
+    },
   ) => {
-    if (typeof definitionOrId !== "string") return defineDialog(definitionOrId);
-    if (builder === undefined) throw new TypeError("A nested dialog requires a builder");
-    const localWindow = ((localId: string, definition: unknown) =>
-      windowFactory(`${definitionOrId}.${localId}`, definition as never)) as WindowFactory<C, Services>;
+    if (builder === undefined) throw new TypeError("A nested dialog requires a definition");
+    const dialogViewModel = builder.viewModel;
+    const localWindow = ((localId: string, definition: object) =>
+      windowFactory(`${definitionOrId}.${localId}`, {
+        ...definition,
+        viewModel: dialogViewModel,
+      } as never)) as DialogWindowFactory<C, any, any, Services>;
     return defineDialog({
       id: definitionOrId,
-      ...builder({ viewModel, window: localWindow, widgets }),
+      viewModel: dialogViewModel,
+      windows: builder.windows({ window: localWindow, widgets, ui }),
+      initial: builder.initial,
+      scope: builder.scope,
+      access: builder.access,
     });
   }) as DialogFactory<C, Services, Widgets>;
 }
 
 /** Shared low-level definition DSL used by kits and standalone extensions. */
 export const widgetDefinitionDsl: WidgetDefinitionDsl = Object.freeze({
-  button,
-  urlButton,
   widget: Object.freeze({
     text: defineTextWidget,
     media: defineMediaWidget,

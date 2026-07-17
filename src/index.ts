@@ -1,170 +1,9 @@
-export {
-  back,
-  backButton,
-  animation,
-  animationInput,
-  audio,
-  audioInput,
-  button,
-  close,
-  closeButton,
-  createViewModelFactory,
-  defineDialog,
-  document,
-  documentInput,
-  go,
-  goButton,
-  intent,
-  intentButton,
-  invalid,
-  contactInput,
-  locationInput,
-  messageInput,
-  photo,
-  photoInput,
-  replace,
-  replaceButton,
-  reset,
-  resetButton,
-  t,
-  textInput,
-  stickerInput,
-  urlButton,
-  valid,
-  video,
-  videoInput,
-  viewModel,
-  voice,
-  voiceInput,
-  window,
-  type Awaitable,
-  type ActionButtonOptions,
-  type AccessInstance,
-  type AccessStrategy,
-  type AnimationDefinition,
-  type AnimationInputValue,
-  type AttachmentInputDefinition,
-  type AttachmentInputKind,
-  type AudioDefinition,
-  type AudioInputValue,
-  type ButtonAction,
-  type ButtonDefinition,
-  type DialogDefinition,
-  type DialogResource,
-  type InputDefinition,
-  type InputBindingOptions,
-  type CustomInputDefinition,
-  type ContactInputValue,
-  type DocumentDefinition,
-  type FileInputValue,
-  type InputValidation,
-  type IntentButtonOptions,
-  type IntentContext,
-  type KeyboardDefinition,
-  type KeyboardNode,
-  type KeyboardWidgetDefinition,
-  type KeyboardWidgetInstance,
-  type KeyboardWidgetOptions,
-  type LocaleResolver,
-  type LocationInputValue,
-  type MediaDefinition,
-  type MediaFileSource,
-  type MediaKind,
-  type MessageInputValue,
-  type NavigationController,
-  type NavigationButtonOptions,
-  type PhotoInputValue,
-  type RenderContext,
-  type ScopeResolution,
-  type ScopeStrategy,
-  type StateHandle,
-  type TextSource,
-  type TranslationAdapter,
-  type VideoDefinition,
-  type VideoInputValue,
-  type ViewModelDefinition,
-  type ViewModelFactory,
-  type WindowDefinition,
-  type WidgetAction,
-  type WidgetActionContext,
-  type WidgetActionHandler,
-  type VoiceDefinition,
-  type VoiceInputValue,
-  type StickerInputValue,
-  type CloseButtonOptions,
-} from "./core.js";
-export {
-  defineKeyboardLayout,
-  defineKeyboardWidget,
-  defineInputWidget,
-  defineMediaWidget,
-  defineTextWidget,
-  type InputWidgetFactory,
-  type KeyboardLayoutFactory,
-  type KeyboardWidgetFactory,
-  type MediaWidgetFactory,
-  type TextWidgetFactory,
-} from "./widgets.js";
-export {
-  access,
-  scopes,
-  type AccessStrategies,
-  type ScopeStrategies,
-} from "./policies/scope-access.js";
-export {
-  createCallbackCodec,
-  type CallbackCodec,
-  type CallbackCodecOptions,
-} from "./callbacks/codec.js";
-export {
-  dialogs,
-  type DialogPlugin,
-} from "./integration/grammy-plugin.js";
-export {
-  DialogRuntime,
-} from "./runtime/dialog-runtime.js";
-export type {
-  DialogController,
-  DialogFlavor,
-  DialogRuntimeOptions,
-  InstanceHandle,
-  ShowOptions,
-  StartOptions,
-  UiController,
-} from "./runtime/contracts.js";
-export {
-  MemoryStorageAdapter,
-  type CallbackRecord,
-  type DialogStorageRecord,
-  type InstanceRecord,
-  type StackFrame,
-  type SurfaceReference,
-} from "./persistence/storage.js";
-export {
-  closeStrategies,
-  isRecoverableEditError,
-  presentations,
-  type CloseStrategies,
-  type PresentationStrategies,
-} from "./presentation/strategies.js";
-export type {
-  CloseOperation,
-  ClosePlanContext,
-  CloseStrategy,
-  PresentationOperation,
-  PresentationPlanContext,
-  PresentationStrategy,
-  SurfaceKind,
-} from "./presentation/contracts.js";
-export {
-  inputRouting,
-  type InputRoutingStrategies,
-} from "./input-routing/strategies.js";
-export type {
-  InputRouteCandidate,
-  InputRoutingContext,
-  InputRoutingStrategy,
-} from "./input-routing/contracts.js";
+/**
+ * Declarative, application-bound Telegram dialog interfaces for grammY.
+ *
+ * @module
+ */
+
 export { createDialogKit } from "./kit/dialog-kit.js";
 export {
   defineDialogExtension,
@@ -180,15 +19,92 @@ export type {
   DialogsFrom,
   ResourceCatalog,
   WidgetCatalog,
-  WindowsFrom,
   WindowCatalog,
+  WindowsFrom,
 } from "./kit/contracts.js";
 export type {
   DialogDefinitionDsl,
-  DialogBuilderContext,
-  DialogBuilderResult,
   DialogFactory,
+  DialogWindowFactory,
+  DialogWindowsContext,
   WidgetDefinitionDsl,
   WindowFactory,
 } from "./kit/definition-dsl.js";
-export type { BuiltInWidgetCatalog } from "./kit/built-in-widgets.js";
+export type {
+  BuiltInUiCatalog,
+  InputFactory,
+  IntentButtonFactory,
+  TextInputFactory,
+} from "./kit/built-in-widgets.js";
+
+export type {
+  DialogController,
+  DialogFlavor,
+  InstanceHandle,
+  ShowOptions,
+  StartOptions,
+  UiController,
+} from "./runtime/contracts.js";
+export type { DialogPlugin } from "./integration/grammy-plugin.js";
+
+export {
+  MemoryStorageAdapter,
+  type CallbackRecord,
+  type CoordinatedStorageAdapter,
+  type DialogStorageRecord,
+  type IdentityCoordinator,
+  type InstanceRecord,
+  type StackFrame,
+  type SurfaceReference,
+} from "./persistence/storage.js";
+export type {
+  AccessInstance,
+  AccessStrategy,
+  ScopeResolution,
+  ScopeStrategy,
+} from "./definitions/policies.js";
+export type {
+  CloseStrategy,
+  PresentationStrategy,
+} from "./presentation/contracts.js";
+export type { InputRoutingStrategy } from "./input-routing/contracts.js";
+export type {
+  CallbackCodec,
+  CallbackCodecOptions,
+} from "./callbacks/codec.js";
+
+export type {
+  AnimationInputValue,
+  AudioInputValue,
+  ContactInputValue,
+  FileInputValue,
+  LocationInputValue,
+  MessageInputValue,
+  PhotoInputValue,
+  StickerInputValue,
+  VideoInputValue,
+  VoiceInputValue,
+} from "./definitions/input.js";
+export type {
+  IntentContext,
+  IntentHandler,
+  IntentReference,
+  ViewModelDefinition,
+  ViewModelFactory,
+} from "./definitions/view-model.js";
+export type {
+  LocaleResolver,
+  Translation,
+  TranslationAdapter,
+} from "./definitions/i18n.js";
+export type {
+  DialogDefinition,
+  DialogResource,
+  WindowDefinition,
+} from "./definitions/window.js";
+export type {
+  KeyboardWidgetInstance,
+  KeyboardWidgetOptions,
+  WidgetActionContext,
+  WidgetActionHandler,
+} from "./definitions/keyboard.js";

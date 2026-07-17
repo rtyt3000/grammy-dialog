@@ -13,8 +13,7 @@
     "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
-      "@ppsh/grammy-dialog": ["./src/index.ts"],
-      "@ppsh/grammy-dialog/widgets": ["./src/widgets.ts"]
+      "@ppsh/grammy-dialog": ["./src/index.ts"]
     },
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,

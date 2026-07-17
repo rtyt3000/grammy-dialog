@@ -75,13 +75,19 @@ export type KeyboardDefinition<
 > = ReadonlyArray<ReadonlyArray<KeyboardButtonDefinition<C, View, Services>>>;
 
 /** Values available to an action declared by a stateful keyboard widget. */
-export interface WidgetActionContext<C extends Context, Props, State, Services> {
+export interface WidgetActionContext<
+  C extends Context,
+  Props,
+  State,
+  Services,
+  Payload = undefined,
+> {
   readonly ctx: C;
   readonly props: Props;
   readonly state: StateHandle<State>;
   readonly services: Services;
   readonly navigation: NavigationController;
-  readonly payload: unknown;
+  readonly payload: Payload;
 }
 
 /** Handler for one named keyboard widget action. */
@@ -90,11 +96,24 @@ export type WidgetActionHandler<
   Props = unknown,
   State = unknown,
   Services = unknown,
-> = (context: WidgetActionContext<C, Props, State, Services>) => Awaitable<void>;
+  Payload = undefined,
+> = (context: WidgetActionContext<C, Props, State, Services, Payload>) => Awaitable<void>;
+
+type WidgetPayload<Handler> = Handler extends WidgetActionHandler<
+  any,
+  any,
+  any,
+  any,
+  infer Payload
+> ? Payload : never;
+
+type WidgetActionCreator<Payload> = [Payload] extends [undefined]
+  ? () => WidgetAction
+  : (payload: Payload) => WidgetAction;
 
 /** Type-safe action creators exposed to a keyboard widget renderer. */
 export type WidgetActions<Actions extends Record<string, WidgetActionHandler<any, any, any, any>>> = {
-  readonly [Key in keyof Actions]: (payload?: unknown) => WidgetAction;
+  readonly [Key in keyof Actions]: WidgetActionCreator<WidgetPayload<Actions[Key]>>;
 };
 
 /** Render context extended with the current keyboard widget state and actions. */
@@ -104,7 +123,7 @@ export interface KeyboardWidgetRenderContext<
   Services,
   Props,
   State,
-  Actions extends Record<string, WidgetActionHandler<C, Props, State, Services>>,
+  Actions extends Record<string, WidgetActionHandler<C, Props, State, Services, any>>,
 > extends RenderContext<C, View, Services> {
   readonly props: Props;
   readonly state: StateHandle<State>;
@@ -118,14 +137,15 @@ export interface KeyboardWidgetDefinition<
   Services = unknown,
   Props = unknown,
   State = unknown,
-  Actions extends Record<string, WidgetActionHandler<C, Props, State, Services>> = Record<
+  Actions extends Record<string, WidgetActionHandler<C, Props, State, Services, any>> = Record<
     string,
-    WidgetActionHandler<C, Props, State, Services>
+    WidgetActionHandler<C, Props, State, Services, any>
   >,
 > {
   readonly state: {
     readonly version: number;
     readonly initial: (props: Props) => State;
+    readonly migrate?: (value: unknown, fromVersion: number, props: Props) => State;
   };
   readonly actions: Actions;
   readonly render: (
@@ -140,9 +160,9 @@ export type KeyboardWidgetOptions<
   Services = unknown,
   Props = unknown,
   State = unknown,
-  Actions extends Record<string, WidgetActionHandler<C, Props, State, Services>> = Record<
+  Actions extends Record<string, WidgetActionHandler<C, Props, State, Services, any>> = Record<
     string,
-    WidgetActionHandler<C, Props, State, Services>
+    WidgetActionHandler<C, Props, State, Services, any>
   >,
 > = Omit<
   KeyboardWidgetDefinition<C, View, Services, Props, State, Actions>,
@@ -151,6 +171,7 @@ export type KeyboardWidgetOptions<
   readonly state: {
     readonly version?: number;
     readonly initial: (props: Props) => State;
+    readonly migrate?: (value: unknown, fromVersion: number, props: Props) => State;
   };
 };
 
@@ -168,10 +189,28 @@ export interface KeyboardWidgetInstance<
   readonly definition: KeyboardWidgetDefinition<C, View, Services, Props, State, any>;
 }
 
-/** A raw inline keyboard or a mounted stateful keyboard widget. */
+/** A composition of raw rows and independently stateful keyboard widgets. */
+export interface KeyboardGroup<
+  C extends Context = Context,
+  View = unknown,
+  Services = unknown,
+> {
+  readonly kind: "keyboard-group";
+  readonly children: ReadonlyArray<KeyboardNode<C, View, Services>>;
+}
+
+/** A raw inline keyboard, a mounted stateful widget, or their composition. */
 export type KeyboardNode<C extends Context = Context, View = unknown, Services = unknown> =
   | KeyboardDefinition<C, View, Services>
-  | KeyboardWidgetInstance<C, View, Services, any, any>;
+  | KeyboardWidgetInstance<C, View, Services, any, any>
+  | KeyboardGroup<C, View, Services>;
+
+/** Combines raw rows and stateful widgets into one keyboard tree. */
+export function keyboard<C extends Context = Context, View = unknown, Services = unknown>(
+  ...children: ReadonlyArray<KeyboardNode<C, View, Services>>
+): KeyboardGroup<C, View, Services> {
+  return { kind: "keyboard-group", children };
+}
 
 /** Static keyboard content or a render-time keyboard resolver. */
 export type KeyboardSource<C extends Context = Context, View = unknown, Services = unknown> =

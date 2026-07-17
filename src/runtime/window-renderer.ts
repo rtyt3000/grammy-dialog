@@ -2,6 +2,7 @@ import type { Context, InputFile } from "grammy";
 import type { InlineKeyboardMarkup, ParseMode } from "grammy/types";
 import type { CallbackCodec } from "../callbacks/codec.js";
 import {
+  type KeyboardDefinition,
   type KeyboardNode,
   type KeyboardWidgetInstance,
   type RenderContext,
@@ -89,6 +90,7 @@ export class WindowRenderer<
       : typeof selectedWindow.keyboard === "function"
         ? await selectedWindow.keyboard(renderContext)
         : selectedWindow.keyboard;
+    this.assertUniqueWidgetIds(keyboard);
     const rows = await this.renderKeyboardNode(instance, keyboard, renderContext);
     const callbackTokens: string[] = [];
     const inlineKeyboard: InlineKeyboardMarkup["inline_keyboard"] = [];
@@ -110,7 +112,6 @@ export class WindowRenderer<
         const token = this.codec.decode(callbackData)!;
         const record: CallbackRecord = {
           instanceId: instance.id,
-          windowId: selectedWindow.id,
           revision: instance.revision,
           action: definition.action,
           chatId: instance.chatId,
@@ -139,7 +140,8 @@ export class WindowRenderer<
     ctx?: C,
   ): Promise<RenderContext<C, unknown, Services>> {
     const state = this.instanceState(instance);
-    const vm = await selectedWindow.viewModel.load({
+    const viewModel = this.registry.viewModel(instance, selectedWindow);
+    const vm = await viewModel.load({
       ctx,
       state: state.value,
       services: this.services,
@@ -174,7 +176,9 @@ export class WindowRenderer<
     if (record === undefined || record.version !== widget.definition.state.version) {
       record = {
         version: widget.definition.state.version,
-        value: widget.definition.state.initial(widget.props),
+        value: record === undefined || widget.definition.state.migrate === undefined
+          ? widget.definition.state.initial(widget.props)
+          : widget.definition.state.migrate(record.value, record.version, widget.props),
       };
       instance.widgetStates[widget.id] = record;
     }
@@ -193,12 +197,25 @@ export class WindowRenderer<
     return !Array.isArray(node) && (node as { kind?: string }).kind === "keyboard-widget";
   }
 
+  /** Narrows a keyboard node to a composition group. */
+  public isKeyboardGroup(
+    node: KeyboardNode<C, any, Services>,
+  ): node is Extract<KeyboardNode<C, any, Services>, { kind: "keyboard-group" }> {
+    return !Array.isArray(node) && (node as { kind?: string }).kind === "keyboard-group";
+  }
+
   private async renderKeyboardNode(
     instance: InstanceRecord,
     node: KeyboardNode<C, any, Services>,
     context: RenderContext<C, any, Services>,
-  ) {
+  ): Promise<KeyboardDefinition<C, any, Services>> {
     if (Array.isArray(node)) return node;
+    if (this.isKeyboardGroup(node)) {
+      const rows: KeyboardDefinition<C, any, Services>[] = await Promise.all(
+        node.children.map(child => this.renderKeyboardNode(instance, child, context)),
+      );
+      return rows.flat();
+    }
     const widget = node as KeyboardWidgetInstance<C, any, Services, any, any>;
     const state = this.widgetState(instance, widget);
     const actions = Object.fromEntries(
@@ -218,6 +235,35 @@ export class WindowRenderer<
       state,
       actions,
     });
+  }
+
+  /** Finds one mounted stateful widget anywhere in a composed keyboard tree. */
+  public findKeyboardWidget(
+    node: KeyboardNode<C, any, Services>,
+    id: string,
+  ): KeyboardWidgetInstance<C, any, Services, any, any> | undefined {
+    if (Array.isArray(node)) return undefined;
+    if (this.isKeyboardGroup(node)) {
+      for (const child of node.children) {
+        const found = this.findKeyboardWidget(child, id);
+        if (found !== undefined) return found;
+      }
+      return undefined;
+    }
+    return this.isKeyboardWidget(node) && node.id === id ? node : undefined;
+  }
+
+  private assertUniqueWidgetIds(node: KeyboardNode<C, any, Services>): void {
+    const ids = new Set<string>();
+    const visit = (current: KeyboardNode<C, any, Services>): void => {
+      if (this.isKeyboardWidget(current)) {
+        if (ids.has(current.id)) throw new Error(`Duplicate keyboard widget id: ${current.id}`);
+        ids.add(current.id);
+        return;
+      }
+      if (this.isKeyboardGroup(current)) current.children.forEach(visit);
+    };
+    visit(node);
   }
 
   private instanceState(instance: InstanceRecord): StateHandle<any> {

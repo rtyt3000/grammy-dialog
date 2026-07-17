@@ -12,6 +12,7 @@ import type {
   TextSource,
   WidgetActionHandler,
 } from "./core.js";
+import type { IntentReference } from "./definitions/view-model.js";
 
 /** Curried factory used to define a reusable text widget with typed props. */
 export interface TextWidgetFactory<Props> {
@@ -70,13 +71,14 @@ export interface InputWidgetFactory<Props, Value> {
     parse(ctx: C, props: Props): Awaitable<Value>;
     validate?: (value: Value, props: Props) => Awaitable<import("./core.js").InputValidation<Value>>;
   }): (
-    props: Props & { readonly id: string; readonly onReceive?: string },
+    id: string,
+    intent: IntentReference<any, Value>,
+    props: Props,
   ) => CustomInputDefinition<C, Value>;
 }
 
 /**
- * Starts definition of a custom input widget.
- * Mounted inputs use their `id` as `onReceive` unless it is overridden.
+ * Starts definition of a custom input widget mounted with a typed intent reference.
  */
 export function defineInputWidget<Props, Value>(): InputWidgetFactory<Props, Value> {
   return function define<C extends Context = Context>(definition: {
@@ -85,19 +87,19 @@ export function defineInputWidget<Props, Value>(): InputWidgetFactory<Props, Val
     validate?: (value: Value, props: Props) => Awaitable<import("./core.js").InputValidation<Value>>;
   }) {
     return (
-      props: Props & { readonly id: string; readonly onReceive?: string },
+      id: string,
+      intent: IntentReference<any, Value>,
+      props: Props,
     ): CustomInputDefinition<C, Value> => {
-      const { id, onReceive = id, ...inputProps } = props;
-      const resolvedProps = inputProps as Props;
       return {
         kind: "custom",
         id,
-        onReceive,
-        match: ctx => definition.match(ctx, resolvedProps),
-        parse: ctx => definition.parse(ctx, resolvedProps),
+        onReceive: intent.name,
+        match: ctx => definition.match(ctx, props),
+        parse: ctx => definition.parse(ctx, props),
         validate: definition.validate === undefined
           ? undefined
-          : value => definition.validate!(value, resolvedProps),
+          : value => definition.validate!(value, props),
       };
     };
   };
@@ -109,51 +111,73 @@ export interface KeyboardWidgetFactory<Props, State> {
     C extends Context = Context,
     View = unknown,
     Services = unknown,
-    Actions extends Record<string, WidgetActionHandler<C, Props, State, Services>> = Record<
+    Actions extends Record<string, WidgetActionHandler<C, Props, State, Services, any>> = Record<
       string,
-      WidgetActionHandler<C, Props, State, Services>
+      WidgetActionHandler<C, Props, State, Services, any>
     >,
   >(
     definition: KeyboardWidgetOptions<C, View, Services, Props, State, Actions>,
   ): (
-    props: Props & { readonly id: string },
+    id: string,
+    props: Props,
   ) => KeyboardWidgetInstance<C, View, Services, Props, State>;
 }
 
-/**
- * Starts definition of a stateful keyboard widget.
- * Widget state is isolated by the mounted `id`; its schema version defaults to `1`.
- */
-export function defineKeyboardWidget<Props, State>(): KeyboardWidgetFactory<Props, State> {
-  return (function define<
+/** Defines a stateful keyboard widget while inferring props and state. */
+export function defineKeyboardWidget<
+  Props,
+  State,
+  C extends Context = Context,
+  View = unknown,
+  Services = unknown,
+  Actions extends Record<string, WidgetActionHandler<C, Props, State, Services, any>> = Record<
+    string,
+    WidgetActionHandler<C, Props, State, Services, any>
+  >,
+>(
+  definition: KeyboardWidgetOptions<C, View, Services, Props, State, Actions>,
+): (
+  id: string,
+  props: Props,
+) => KeyboardWidgetInstance<C, View, Services, Props, State>;
+/** Starts a curried definition when props and state are supplied explicitly. */
+export function defineKeyboardWidget<Props, State>(): KeyboardWidgetFactory<Props, State>;
+export function defineKeyboardWidget(
+  definition?: KeyboardWidgetOptions<any, any, any, any, any, any>,
+): unknown {
+  const define = function define<
+    Props,
+    State,
     C extends Context = Context,
     View = unknown,
     Services = unknown,
-    Actions extends Record<string, WidgetActionHandler<C, Props, State, Services>> = Record<
+    Actions extends Record<string, WidgetActionHandler<C, Props, State, Services, any>> = Record<
       string,
-      WidgetActionHandler<C, Props, State, Services>
+      WidgetActionHandler<C, Props, State, Services, any>
     >,
-  >(definition: KeyboardWidgetOptions<C, View, Services, Props, State, Actions>) {
+  >(options: KeyboardWidgetOptions<C, View, Services, Props, State, Actions>) {
     const normalized: KeyboardWidgetDefinition<C, View, Services, Props, State, Actions> = {
-      ...definition,
+      ...options,
       state: {
-        version: definition.state.version ?? 1,
-        initial: definition.state.initial,
+        version: options.state.version ?? 1,
+        initial: options.state.initial,
+        migrate: options.state.migrate,
       },
-      actions: definition.actions,
+      actions: options.actions,
     };
     return (
-      props: Props & { readonly id: string },
+      id: string,
+      props: Props,
     ): KeyboardWidgetInstance<C, View, Services, Props, State> => {
-      const { id, ...widgetProps } = props;
       return {
         kind: "keyboard-widget",
         id,
-        props: widgetProps as Props,
+        props,
         definition: normalized,
       };
     };
-  }) as KeyboardWidgetFactory<Props, State>;
+  };
+  return definition === undefined ? define : define(definition);
 }
 
 /** Curried factory used to define a reusable stateless keyboard layout. */

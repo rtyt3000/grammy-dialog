@@ -10,7 +10,10 @@ import type {
 } from "../core.js";
 import type { CallbackCodec, CallbackCodecOptions } from "../callbacks/codec.js";
 import type { InputRoutingStrategy } from "../input-routing/contracts.js";
-import type { DialogStorageRecord } from "../persistence/storage.js";
+import type {
+  DialogStorageRecord,
+  IdentityCoordinator,
+} from "../persistence/storage.js";
 import type { CloseStrategy, PresentationStrategy } from "../presentation/contracts.js";
 
 /** Configuration accepted by `dialogs()` and `DialogRuntime`. */
@@ -19,6 +22,11 @@ export interface DialogRuntimeOptions<C extends Context = Context, Services = un
   list: ReadonlyArray<DialogResource<C>>;
   /** grammY storage adapter; defaults to an in-memory adapter. */
   storage?: StorageAdapter<DialogStorageRecord>;
+  /**
+   * Distributed coordinator required by keyed instances unless `storage`
+   * exposes a shared `identities` coordinator itself.
+   */
+  identities?: IdentityCoordinator;
   /** Application dependencies exposed to ViewModels and renderers. */
   services?: Services;
   /** Built-in callback codec options or a complete custom codec. */
@@ -32,6 +40,8 @@ export interface DialogRuntimeOptions<C extends Context = Context, Services = un
   defaultLocale?: string;
   /** Callback record lifetime in milliseconds; defaults to seven days. */
   callbackTtlMs?: number;
+  /** Maximum number of frames in one dialog stack; defaults to `32`. */
+  maxStackDepth?: number;
   /** Runtime policy defaults overridden by dialog or window definitions. */
   defaults?: {
     scope?: ScopeStrategy<C>;
@@ -46,6 +56,10 @@ export interface DialogRuntimeOptions<C extends Context = Context, Services = un
 export interface StartOptions {
   data?: unknown;
   locale?: string;
+  /** User-defined identity within the resolved scope and definition. */
+  key?: string;
+  /** Collision behavior when `key` already belongs to an active instance. */
+  mode?: "create" | "reuse" | "replace";
 }
 
 /** Address and actor overrides for showing a standalone window. */
@@ -64,7 +78,10 @@ export interface InstanceHandle {
 /** Dialog operations installed on `ctx.dialog`. */
 export interface DialogController {
   /** Starts and mounts a new dialog instance. */
-  start(dialog: string | DialogDefinition<any>, options?: StartOptions): Promise<InstanceHandle>;
+  start(
+    dialog: string | DialogDefinition<any, any, any, any>,
+    options?: StartOptions,
+  ): Promise<InstanceHandle>;
   /** Stores a locale and immediately rerenders the current window. */
   setLocale(instanceId: string, locale: string): Promise<void>;
 }

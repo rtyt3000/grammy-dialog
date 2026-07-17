@@ -1,19 +1,13 @@
 import type { Context } from "grammy";
 import {
-  button,
-  createViewModelFactory,
-  defineDialog,
-  intent,
-  valid,
-  viewModel,
-  window,
+  createDialogKit,
+  type DialogDefinition,
   type DialogFlavor,
+  type IntentContext,
+  type PhotoInputValue,
+  type WidgetActionContext,
   type WindowDefinition,
 } from "../mod.ts";
-import {
-  defineInputWidget,
-  defineKeyboardWidget,
-} from "../widgets.ts";
 
 type Equal<Left, Right> =
   (<Value>() => Value extends Left ? 1 : 2) extends
@@ -23,167 +17,127 @@ type Equal<Left, Right> =
 type Expect<Value extends true> = Value;
 
 interface Services {
-  users: {
-    displayName(id: number): Promise<string>;
-  };
+  users: { displayName(id: number): Promise<string> };
 }
 
 type BotContext = Context & DialogFlavor;
-type ProfileState = { name: string; visits: number };
-type ProfileView = { title: string; visits: number };
+type ProfileState = { name: string; photo?: string };
+type ProfileView = { title: string; photo?: string };
 
-const appViewModel = createViewModelFactory<BotContext, Services>();
-const factoryVm = appViewModel({
-  initialState: (): ProfileState => ({ name: "Ada", visits: 0 }),
-  load: ({ state, services }) => ({
-    title: `${state.name}: ${services.users}`,
-    visits: state.visits,
-  }),
-  intents: {
-    visit({ state }) {
-      state.update(current => ({ ...current, visits: current.visits + 1 }));
-    },
-  },
-});
-type FactoryView = typeof factoryVm extends import("../mod.ts").ViewModelDefinition<
-  any,
-  infer View,
-  any,
-  any
-> ? View : never;
-type _FactoryViewIsInferred = Expect<Equal<FactoryView, ProfileView>>;
-
-appViewModel({
-  initialState: { count: 0 },
-  intents: {
-    increment({ state }) {
-      state.update(current => ({ count: current.count + 1 }));
-    },
-  },
-});
-
-const profileVm = viewModel<ProfileState, ProfileView, BotContext, Services>({
-  initialState: { name: "Ada", visits: 0 },
+const builder = createDialogKit<BotContext, Services>();
+const profileVm = builder.viewModel({
+  initialState: (): ProfileState => ({ name: "Ada" }),
   async load({ state, services, actor }) {
-    const displayName = await services.users.displayName(actor.id ?? 0);
-    return { title: `${displayName}: ${state.name}`, visits: state.visits };
+    return {
+      title: `${await services.users.displayName(actor.id ?? 0)}: ${state.name}`,
+      photo: state.photo,
+    };
   },
   intents: {
-    visit({ state }) {
-      state.update(current => ({ ...current, visits: current.visits + 1 }));
+    rename({ state, value }: IntentContext<
+      BotContext,
+      ProfileState,
+      ProfileView,
+      Services,
+      undefined,
+      string
+    >) {
+      state.update(current => ({ ...current, name: value }));
     },
-    invalidState({ state }) {
-      // @ts-expect-error State updates must preserve ProfileState.
-      state.set({ name: "Ada", visits: "once" });
+    savePhoto({ state, value }: IntentContext<
+      BotContext,
+      ProfileState,
+      ProfileView,
+      Services,
+      undefined,
+      PhotoInputValue
+    >) {
+      state.update(current => ({ ...current, photo: value.fileId }));
+    },
+    openUser({ payload }: IntentContext<
+      BotContext,
+      ProfileState,
+      ProfileView,
+      Services,
+      { userId: number },
+      undefined
+    >) {
+      payload.userId.toFixed();
     },
   },
 });
 
-const profileWindow = window("profile.main", {
+const profile = builder.dialog("profile", {
   viewModel: profileVm,
-  text: ({ vm, services }) => `${vm.title} (${vm.visits}) ${services.users}`,
-  keyboard: [[button("Visit", "visit")]],
+  windows: ({ window, ui }) => ({
+    main: window("main", {
+      text: ({ vm, services }) => `${vm.title} ${services.users}`,
+      keyboard: [[
+        ui.button.intent("Open", profileVm.actions.openUser, {
+          payload: { userId: 42 },
+        }),
+      ]],
+      input: [
+        ui.input.text("name", profileVm.actions.rename),
+        ui.input.photo("photo", profileVm.actions.savePhoto),
+      ],
+    }),
+  }),
 });
 
-const staticWindow = window("static", {
+type ProfileDialogState = typeof profile extends DialogDefinition<any, infer State, any, any>
+  ? State
+  : never;
+type _DialogState = Expect<Equal<ProfileDialogState, ProfileState>>;
+
+builder.dialog("invalid", {
+  viewModel: profileVm,
+  windows: ({ window, ui }) => ({
+    main: window("main", {
+      // @ts-expect-error Photo input cannot target a string-valued intent.
+      input: [ui.input.photo("photo", profileVm.actions.rename)],
+    }),
+  }),
+});
+
+builder.ui.button.intent("Invalid", profileVm.actions.openUser, {
+  // @ts-expect-error Intent payload is checked through its reference.
+  payload: { userId: "42" },
+});
+// @ts-expect-error Public intent buttons require a ViewModel intent reference.
+builder.ui.button.intent("Invalid", "openUser");
+
+const notice = builder.window("notice", {
   text: ({ vm }) => JSON.stringify(vm),
-  parseMode: "HTML",
 });
-type StaticState = typeof staticWindow extends WindowDefinition<any, infer State, any, any>
+type NoticeState = typeof notice extends WindowDefinition<any, infer State, any, any>
   ? State
   : never;
-type _StaticStateIsEmpty = Expect<Equal<StaticState, {}>>;
+type _StaticState = Expect<Equal<NoticeState, {}>>;
 
-const identityVm = viewModel({ initialState: { count: 0 } });
-const identityWindow = window("identity", {
-  viewModel: identityVm,
-  text: ({ vm }) => String(vm.count),
-});
-type IdentityView = typeof identityWindow extends WindowDefinition<any, any, infer View, any>
-  ? View
-  : never;
-type _IdentityViewIsState = Expect<Equal<IdentityView, { count: number }>>;
-
-window("static.invalid", {
-  // @ts-expect-error Static windows expose an empty view.
-  text: ({ vm }) => vm.missing,
-});
-
-window("parse-mode.invalid", {
-  text: "Invalid",
-  // @ts-expect-error Parse mode is limited to Telegram-supported values.
-  parseMode: "BBCode",
-});
-
-type InferredState = typeof profileWindow extends WindowDefinition<any, infer State, any, any>
-  ? State
-  : never;
-type InferredView = typeof profileWindow extends WindowDefinition<any, any, infer View, any>
-  ? View
-  : never;
-type InferredServices = typeof profileWindow extends WindowDefinition<any, any, any, infer Service>
-  ? Service
-  : never;
-type _StateIsPreserved = Expect<Equal<InferredState, ProfileState>>;
-type _ViewIsPreserved = Expect<Equal<InferredView, ProfileView>>;
-type _ServicesArePreserved = Expect<Equal<InferredServices, Services>>;
-
-window("profile.invalid", {
-  viewModel: profileVm,
-  // @ts-expect-error Window render context uses the ViewModel's returned view.
-  text: ({ vm }) => vm.missingProperty,
-});
-
-const profileDialog = defineDialog({
-  id: "profile",
-  windows: { main: profileWindow },
-});
-
-declare const botContext: BotContext;
-botContext.dialog.start(profileDialog);
-botContext.ui.show(profileWindow);
-
-intent<{ userId: number }>("open-user", { userId: 42 });
-// @ts-expect-error A typed intent payload is required.
-intent<{ userId: number }>("open-user");
-// @ts-expect-error Intent payload shape is checked.
-intent<{ userId: number }>("open-user", { userId: "42" });
-
-const counter = defineKeyboardWidget<{ step: number }, number>()({
-  state: {
-    initial: props => props.step,
-  },
-  actions: {
-    increment({ state, props }) {
-      state.update(value => value + props.step);
+const counterExtension = builder.extension(({ widget, ui }) => {
+  const counter = widget.keyboard({
+    state: { initial: (props: { step: number }) => props.step },
+    actions: {
+      increment({ state, payload }: WidgetActionContext<any, { step: number }, number, any, number>) {
+        state.update(value => value + payload);
+      },
     },
-  },
-  render({ state, actions }) {
-    return [[button(String(state.value), actions.increment())]];
-  },
+    render({ state, actions }) {
+      return [[ui.button.raw(String(state.value), actions.increment(1))]];
+    },
+  });
+  return { widgets: { counter } };
 });
 
-counter({ id: "counter", step: 2 });
-// @ts-expect-error Widget props are required and inferred by the factory.
-counter({ id: "counter" });
-// @ts-expect-error Unknown widget props are rejected.
-counter({ id: "counter", step: 2, extra: true });
+const app = builder.use(counterExtension).define(() => ({ profile, notice }));
+app.widgets.counter("counter", { step: 2 });
+// @ts-expect-error Custom widget props remain inferred.
+app.widgets.counter("counter", {});
+app.dialogs.profile;
+app.windows.notice;
+app.middleware({ services: {} as Services });
 
-defineKeyboardWidget<Record<string, never>, number>()({
-  state: { initial: () => 0 },
-  actions: { increment({ state }) { state.update(value => value + 1); } },
-  render({ actions }) {
-    // @ts-expect-error Render exposes only declared widget actions.
-    return [[button("Unknown", actions.decrement())]];
-  },
-});
-
-const positiveIntegerInput = defineInputWidget<{ minimum: number }, number>()({
-  match: ctx => ctx.message?.text !== undefined,
-  parse: ctx => Number(ctx.message?.text),
-  validate: (value, props) => valid(Math.max(value, props.minimum)),
-});
-
-positiveIntegerInput({ id: "amount", minimum: 1 });
-// @ts-expect-error Custom input props are checked.
-positiveIntegerInput({ id: "amount", onReceive: "amountEntered", minimum: "1" });
+declare const ctx: BotContext;
+ctx.dialog.start(app.dialogs.profile, { key: "primary", mode: "reuse" });
+ctx.ui.show(app.windows.notice);

@@ -10,7 +10,7 @@ import {
   viewModel,
   window,
   type DialogStorageRecord,
-} from "../src/index.js";
+} from "../src/internal.js";
 import { JsonStorageAdapter, type TestContext } from "./helpers.js";
 
 describe("DSL defaults", () => {
@@ -28,7 +28,7 @@ describe("DSL defaults", () => {
       text: ({ vm }) => `Count: ${vm.count}`,
       keyboard: [[button("Increment", "increment")]],
     });
-    const dialog = defineDialog({ id: "defaults", windows: { main } });
+    const dialog = defineDialog({ id: "defaults", viewModel: vm, windows: { main } });
     const bot = new Bot<TestContext>("test-token");
     bot.use(dialogs<TestContext>({ list: [dialog] }));
     bot.command("defaults", ctx => ctx.dialog.start("defaults"));
@@ -92,6 +92,6 @@ describe("DSL defaults", () => {
       render: () => [],
     });
 
-    expect(counter({ id: "counter" }).definition.state.version).toBe(1);
+    expect(counter("counter", {}).definition.state.version).toBe(1);
   });
 });

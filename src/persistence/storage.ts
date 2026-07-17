@@ -1,6 +1,16 @@
 import type { StorageAdapter } from "grammy";
 import type { ButtonAction, MediaKind } from "../core.js";
 
+/** Serializes all operations for one scoped identity across runtime processes. */
+export interface IdentityCoordinator {
+  run<T>(identity: string, operation: () => Promise<T>): Promise<T>;
+}
+
+/** Storage adapter that also provides distributed identity serialization. */
+export interface CoordinatedStorageAdapter<T> extends StorageAdapter<T> {
+  readonly identities: IdentityCoordinator;
+}
+
 /** Persisted navigation stack entry. */
 export interface StackFrame {
   windowId: string;
@@ -24,6 +34,7 @@ export interface InstanceRecord {
   chatId: number;
   threadId?: number;
   scopeKey: string;
+  key?: string;
   stack: StackFrame[];
   state: unknown;
   locale: string;
@@ -39,11 +50,9 @@ export interface InstanceRecord {
 /** Persisted callback token binding validated against an instance revision. */
 export interface CallbackRecord {
   instanceId: string;
-  windowId: string;
   revision: number;
   action: ButtonAction;
   chatId: number;
-  allowedUserId?: number;
   expiresAt?: number;
 }
 
@@ -52,11 +61,18 @@ export type DialogStorageRecord =
   | { type: "instance"; version: 1; value: InstanceRecord }
   | { type: "callback"; version: 1; value: CallbackRecord }
   | { type: "focus"; version: 1; value: { instanceId: string } }
-  | { type: "focus"; version: 2; value: { instanceIds: string[] } };
+  | { type: "focus"; version: 2; value: { instanceIds: string[] } }
+  | { type: "identity"; version: 1; value: { instanceId: string } };
 
 /** Non-persistent `StorageAdapter` suitable for development and tests. */
-export class MemoryStorageAdapter<T> implements StorageAdapter<T> {
+export class MemoryStorageAdapter<T> implements CoordinatedStorageAdapter<T> {
   private readonly values = new Map<string, T>();
+  private readonly identityLocks = new Map<string, Promise<void>>();
+
+  /** Process-local coordinator shared by every runtime using this adapter instance. */
+  public readonly identities: IdentityCoordinator = {
+    run: (identity, operation) => this.runIdentity(identity, operation),
+  };
 
   /** Reads a value by its storage key. */
   public read(key: string): T | undefined {
@@ -92,6 +108,25 @@ export class MemoryStorageAdapter<T> implements StorageAdapter<T> {
   public readAllEntries(): Iterable<[string, T]> {
     return this.values.entries();
   }
+
+  private async runIdentity<Result>(
+    identity: string,
+    operation: () => Promise<Result>,
+  ): Promise<Result> {
+    const previous = this.identityLocks.get(identity) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    this.identityLocks.set(identity, current);
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (this.identityLocks.get(identity) === current) this.identityLocks.delete(identity);
+    }
+  }
 }
 
 /** Canonical storage-key builders used by the dialog repository. */
@@ -100,4 +135,6 @@ export const storageKeys = {
   callback: (token: string) => `gd:callback:${token}`,
   focus: (chatId: number, userId: number, threadId?: number) =>
     `gd:focus:${chatId}:${threadId ?? "root"}:${userId}`,
+  identity: (scopeKey: string, definitionId: string, key: string) =>
+    `gd:identity:${encodeURIComponent(scopeKey)}:${encodeURIComponent(definitionId)}:${encodeURIComponent(key)}`,
 };

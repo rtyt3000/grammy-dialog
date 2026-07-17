@@ -9,7 +9,7 @@ import {
   textInput,
   viewModel,
   window,
-} from "../src/index.js";
+} from "../src/internal.js";
 import type { TestContext } from "./helpers.js";
 
 describe("topic dialogs", () => {
@@ -32,6 +32,7 @@ describe("topic dialogs", () => {
     const topicDialog = defineDialog({
       id: "topic",
       initial: "main",
+      viewModel: topicVm,
       windows: { main: topicWindow },
       scope: scopes.topic(),
     });

@@ -8,6 +8,7 @@ import {
   dialogs,
   document,
   documentInput,
+  inputRouting,
   photo,
   video,
   videoInput,
@@ -15,7 +16,7 @@ import {
   voice,
   window,
   type DialogStorageRecord,
-} from "../src/index.js";
+} from "../src/internal.js";
 import { JsonStorageAdapter, type TestContext } from "./helpers.js";
 
 const staticVm = viewModel({ initialState: {}, load: () => ({}), intents: {} });
@@ -101,7 +102,11 @@ describe("expanded media", () => {
     });
     const storage = new JsonStorageAdapter<DialogStorageRecord>();
     const bot = new Bot<TestContext>("test-token");
-    bot.use(dialogs<TestContext>({ list: [videoWindow, documentWindow], storage }));
+    bot.use(dialogs<TestContext>({
+      list: [videoWindow, documentWindow],
+      storage,
+      defaults: { inputRouting: inputRouting.latest() },
+    }));
     bot.command("video", ctx => ctx.ui.show("video-input"));
     bot.command("document", ctx => ctx.ui.show("document-input"));
     const { chats } = await prepareBot(bot);

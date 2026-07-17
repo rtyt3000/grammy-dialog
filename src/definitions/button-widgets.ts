@@ -10,6 +10,7 @@ import {
 } from "./actions.js";
 import { button, type ButtonDefinition } from "./keyboard.js";
 import type { TextSource } from "./rendering.js";
+import type { IntentReference } from "./view-model.js";
 
 /** Shared options for semantic callback-button widgets. */
 export interface ActionButtonOptions {
@@ -48,10 +49,14 @@ export function intentButton<
   Services = unknown,
 >(
   text: TextSource<C, View, Services>,
-  name: string,
+  name: string | IntentReference<Payload, any>,
   options: IntentButtonOptions<Payload> = {},
 ): ButtonDefinition<C, View, Services> {
-  const action: IntentAction<Payload> = { kind: "intent", name, payload: options.payload };
+  const action: IntentAction<Payload> = {
+    kind: "intent",
+    name: typeof name === "string" ? name : name.name,
+    payload: options.payload,
+  };
   return actionButton(text, action, options.id);
 }
 

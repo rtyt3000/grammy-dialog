@@ -3,11 +3,11 @@ import type { InputMedia, ParseMode } from "grammy/types";
 import type { RenderedMedia, RenderedWindow, WindowRenderer } from "./window-renderer.js";
 import type { DialogRepository } from "../persistence/dialog-repository.js";
 import type { InstanceRecord, SurfaceReference } from "../persistence/storage.js";
-import { PresentationPlanner } from "../presentation/planner.js";
 import type {
   CloseOperation,
   CloseStrategy,
   PresentationOperation,
+  PresentationStrategy,
 } from "../presentation/contracts.js";
 
 /** Applies render results to Telegram with persistence-aware compensation. */
@@ -18,7 +18,7 @@ export class SurfaceManager<
   public constructor(
     private readonly renderer: WindowRenderer<C, Services>,
     private readonly repository: DialogRepository,
-    private readonly planner: PresentationPlanner,
+    private readonly presentation: PresentationStrategy,
     private readonly closeStrategy: CloseStrategy,
   ) {}
 
@@ -50,7 +50,10 @@ export class SurfaceManager<
       throw new Error(`Persisted instance '${instance.id}' has no surface`);
     }
     const rendered = await this.renderer.render(instance, ctx);
-    let operation = await this.planner.plan(previous.surface, rendered);
+    let operation = await this.presentation.plan({
+      current: previous.surface,
+      nextKind: rendered.media?.kind ?? "text",
+    });
     let telegramApplied = false;
     let replacementMessageId: number | undefined;
 
@@ -61,7 +64,8 @@ export class SurfaceManager<
           telegramApplied = true;
           instance.surface = this.surface(instance, previous.surface.messageId, rendered);
         } catch (editError) {
-          if (await this.planner.fallbackAfterEditError(editError) === "throw") throw editError;
+          const fallback = await this.presentation.fallbackAfterEditError?.(editError) ?? "throw";
+          if (fallback === "throw") throw editError;
           operation = "replace";
           const message = await this.send(api, instance, rendered);
           replacementMessageId = message.message_id;

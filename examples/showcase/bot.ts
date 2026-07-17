@@ -1,12 +1,4 @@
 import { Bot } from "grammy";
-import {
-  closeStrategies,
-  inputRouting,
-  MemoryStorageAdapter,
-  presentations,
-  type DialogPlugin,
-  type DialogStorageRecord,
-} from "@ppsh/grammy-dialog";
 import type { AppContext, AppServices } from "./app-types.js";
 import { appDialogs } from "./app-dialogs.js";
 import { translationAdapter } from "./i18n.js";
@@ -17,7 +9,6 @@ export function createShowcaseBot(token: string) {
   const bot = new Bot<AppContext>(token);
 
   bot.use(appDialogs.middleware({
-    storage: new MemoryStorageAdapter<DialogStorageRecord>(),
     services,
     i18n: {
       adapter: translationAdapter,
@@ -26,15 +17,15 @@ export function createShowcaseBot(token: string) {
       },
     },
     defaults: {
-      presentation: presentations.auto(),
-      close: closeStrategies.detach(),
-      inputRouting: inputRouting.reply({ fallback: "latest" }),
+      presentation: appDialogs.presentation.auto(),
+      close: appDialogs.close.detach(),
+      inputRouting: appDialogs.inputRouting.replyOrFocused(),
     },
-  }))
+  }));
   bot.command("profile", ctx => ctx.dialog.start(appDialogs.dialogs.profile));
   bot.command("poll", ctx => ctx.dialog.start(appDialogs.dialogs.teamPoll));
   bot.command("counter", ctx => ctx.ui.show(appDialogs.windows.counterCard));
   bot.command("report", ctx => ctx.ui.show(appDialogs.windows.reportReady));
 
-  return { bot};
+  return { bot };
 }

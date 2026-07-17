@@ -1,12 +1,20 @@
 import type { Context, StorageAdapter } from "grammy";
-import type { DialogFlavor } from "../src/index.js";
+import type {
+  DialogFlavor,
+  IdentityCoordinator,
+} from "../src/internal.js";
 
 export type TestContext = Context & DialogFlavor;
 
 export class JsonStorageAdapter<T> implements StorageAdapter<T> {
   protected readonly values = new Map<string, string>();
+  private readonly identityLocks = new Map<string, Promise<void>>();
   private nextWriteFailure?: { prefix: string; error: Error; remaining: number };
   private nextDeleteFailure?: { prefix: string; error: Error };
+
+  public readonly identities: IdentityCoordinator = {
+    run: (identity, operation) => this.runIdentity(identity, operation),
+  };
 
   public read(key: string): T | undefined {
     const value = this.values.get(key);
@@ -57,5 +65,24 @@ export class JsonStorageAdapter<T> implements StorageAdapter<T> {
 
   public failNextDelete(prefix: string, error = new Error("storage delete failed")): void {
     this.nextDeleteFailure = { prefix, error };
+  }
+
+  private async runIdentity<Result>(
+    identity: string,
+    operation: () => Promise<Result>,
+  ): Promise<Result> {
+    const previous = this.identityLocks.get(identity) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    this.identityLocks.set(identity, current);
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (this.identityLocks.get(identity) === current) this.identityLocks.delete(identity);
+    }
   }
 }

@@ -1,3 +1,5 @@
+import type { IntentReference } from "./view-model.js";
+
 /** A stack navigation command produced by a button or an intent handler. */
 export type NavigationAction =
   | { readonly kind: "go"; readonly windowId: string; readonly data?: unknown }
@@ -26,10 +28,14 @@ export type ButtonAction = IntentAction | NavigationAction | WidgetAction;
 
 /** Creates an action that invokes a ViewModel intent with an optional payload. */
 export function intent<Payload = undefined>(
-  name: string,
+  name: string | IntentReference<Payload, any>,
   ...payload: Payload extends undefined ? [] : [payload: Payload]
 ): IntentAction<Payload> {
-  return { kind: "intent", name, payload: payload[0] };
+  return {
+    kind: "intent",
+    name: typeof name === "string" ? name : name.name,
+    payload: payload[0],
+  };
 }
 
 /** Pushes a window onto the current dialog stack. */

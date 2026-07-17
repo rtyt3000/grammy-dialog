@@ -13,7 +13,7 @@ import {
   viewModel,
   window,
   type DialogStorageRecord,
-} from "../src/index.js";
+} from "../src/internal.js";
 import { JsonStorageAdapter, type TestContext } from "./helpers.js";
 
 function sharedDialog() {
@@ -39,6 +39,7 @@ function sharedDialog() {
   return defineDialog({
     id: "shared",
     initial: "main",
+    viewModel: sharedVm,
     windows: { main, input },
     scope: scopes.chat(),
     access: access.everyone(),

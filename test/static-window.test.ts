@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Bot } from "grammy";
 import { prepareBot } from "grammy-testing";
-import { dialogs, photo, window } from "../src/index.js";
+import { dialogs, photo, window } from "../src/internal.js";
 import type { TestContext } from "./helpers.js";
 
 describe("static windows", () => {

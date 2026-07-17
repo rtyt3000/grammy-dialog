@@ -17,8 +17,8 @@ The example uses the preferred immutable `DialogKit` composition model:
 - `counterExtension` demonstrates the third-party `defineDialogExtension` DSL;
 - dialogs use nested local-window builders;
 - each dialog keeps its layout in `index.ts` and state/load/intents in `view-model.ts`;
-- navigation uses semantic widgets such as `widgets.intent`, `widgets.go`, and `widgets.back`;
-- `appDialogs.compose(...)` collects ordinary application resources once;
+- navigation uses categorized primitives such as `ui.button.intent`, `ui.button.go`, and `ui.button.back`;
+- `dialogDsl.define(...)` collects ordinary application resources once;
 - plugin extensions remain reserved for reusable third-party contributions;
 - `appDialogs.middleware(...)` registers every collected resource without a manual `list`.
 

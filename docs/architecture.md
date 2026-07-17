@@ -1,692 +1,357 @@
 # Архитектура grammy-dialog
 
-Статус: draft, реализован первый вертикальный MVP.
-
-Этот документ фиксирует принятые архитектурные решения. Конкретные имена типов и функций пока не считаются стабильным публичным API.
+Статус: реализованный ранний MVP. Документ описывает фактическую модель, а не
+планируемый API.
 
 ## 1. Назначение
 
-`grammy-dialog` — декларативный UI runtime для Telegram-ботов на grammY. Библиотека должна закрывать типовые задачи навигации, хранения UI-состояния, маршрутизации событий, локализации и обновления сообщений, не заставляя разработчика вручную собирать `InlineKeyboard`, кодировать callbacks и регистрировать отдельные handlers.
-## 2. Основная модель
+`grammy-dialog` — декларативный UI runtime для Telegram-ботов на grammY.
+Библиотека управляет навигацией, сериализуемым UI-состоянием, callbacks, input
+routing и обновлением Telegram messages. Единственная публичная точка построения
+приложения — `createDialogKit()`.
+
+## 2. Доменные границы
 
 ```text
-Model            бизнес-данные и сервисы приложения
-   ↓
-ViewModel        подготовка данных и обработка intents
-   ↓
-Window (View)    декларативные text/media/keyboard/input widgets
-   ↓
-Renderer         Window → RenderedWindow
-   ↓
-Surface          одно или несколько Telegram-сообщений
-   ↓
-Runtime          routing, lifecycle, storage и concurrency
+Model/services       бизнес-данные приложения
+        ↓
+Dialog ViewModel     state, load и intents одного workflow
+        ↓
+Window               text, media, keyboard и inputs
+        ↓
+WindowRenderer       definition + state → RenderedWindow
+        ↓
+SurfaceManager       RenderedWindow → Telegram message
+        ↓
+DialogRuntime        routing, locks, focus и persistence coordination
 ```
 
-Центральная runtime-сущность — `WindowInstance`, а не единственный активный Dialog пользователя.
+Главная runtime-сущность — независимый `InstanceRecord`. В одном scope может
+одновременно существовать несколько instances.
+
+## 3. Dialog, ViewModel и Window
 
 ### Dialog
 
-`Dialog` — статическое описание workflow: начальное окно, доступные окна и правила навигации.
+Dialog задаёт workflow, единый ViewModel, набор окон, initial window и политики:
 
 ```ts
-const profileDialog = defineDialog({
-  id: "profile",
-  initial: "overview",
-  windows: {
-    overview: profileWindow,
-    editName: editNameWindow,
-  },
+const profile = builder.dialog("profile", {
+  viewModel: profileVm,
+  scope: builder.scope.member(),
+  access: builder.access.owner(),
+  windows: ({ window }) => ({
+    main: window("main", { text: "Profile" }),
+    edit: window("edit", { text: "Edit profile" }),
+  }),
 });
 ```
+
+Локальные runtime ids автоматически получают префикс: `profile.main`,
+`profile.edit`.
+
+### Единый владелец состояния
+
+У Dialog ровно один ViewModel и одно persisted-состояние. Все окна этого Dialog
+имеют одинаковые `State`, `View`, `Context` и `Services`. При навигации state не
+меняет схему и не переинициализируется.
+
+Это исключает ситуацию, когда Window B получает state, созданный ViewModel окна A.
+
+```ts
+interface ViewModelDefinition<State, View> {
+  initialState(): State;
+  load(context): Awaitable<View>;
+  intents: Record<string, IntentHandler>;
+  actions: Record<string, IntentReference>;
+}
+```
+
+ViewModel definition существует только в registry. В storage сохраняется `State`,
+но не ViewModel, функции, services или grammY Context.
 
 ### Window
 
-`Window` — декларативное View. Оно не обращается напрямую к storage и не решает, каким Telegram-методом обновлять сообщение.
+Window — декларативное представление:
 
-Для статических Window поле `viewModel` необязательно: factory подставляет пустое
-состояние и пустой view. `parseMode` хранится в Window и применяется renderer-ом
-к message text либо media caption.
+- `text` и `parseMode`;
+- одно media attachment;
+- keyboard tree;
+- список input bindings;
+- optional access override.
 
-```ts
-const profileWindow = window("profile.overview", {
-  viewModel: profileViewModel,
+Standalone Window имеет собственный ViewModel. Для статического окна DialogKit
+подставляет пустой identity-ViewModel.
 
-  text: ({ vm, t }) =>
-    t("profile.title", { name: vm.name }),
+## 4. Persisted instance
 
-  keyboard: [
-    [button(t("profile.edit"), "edit")],
-    [close(t("common.close"))],
-  ],
-});
-```
-
-### ViewModel
-
-Основной API функциональный. ViewModel создаётся на время обработки update/render и целиком не сохраняется.
+Упрощённая структура:
 
 ```ts
-const profileViewModel = viewModel({
-  initialState: {
-    editing: false,
-  },
-
-  async load({ actor, services, state }) {
-    const user = await services.users.get(actor.id);
-
-    return {
-      name: user.name,
-      editing: state.editing,
-    };
-  },
-
-  intents: {
-    async edit({ navigation }) {
-      await navigation.go("editName");
-    },
-  },
-});
-```
-
-Разделение ответственности:
-
-- Model — бизнес-данные и сервисы;
-- ViewModel — вычисляемые данные и обработка intents;
-- persisted state — сериализуемое состояние UI;
-- Window — чистое описание представления.
-
-## 3. Dialog stack
-
-Каждый dialog instance имеет независимый stack. Frame должен оставаться компактным и сериализуемым.
-
-```ts
-interface StackFrame {
-  windowId: string;
-  data?: unknown;
-}
-
-interface DialogStack {
+interface InstanceRecord {
   id: string;
-  dialogId: string;
-  frames: StackFrame[];
+  kind: "dialog" | "standalone";
+  definitionId: string;
+  ownerId?: number;
+  chatId: number;
+  threadId?: number;
+  scopeKey: string;
+  key?: string;
+  stack: StackFrame[];
   state: unknown;
+  widgetStates: Record<string, VersionedState>;
   locale: string;
   revision: number;
+  status: "active" | "closed";
+  surface?: SurfaceReference;
+  callbackTokens: string[];
+  focusedUserIds: number[];
+  result?: unknown;
 }
 ```
 
-В stack нельзя сохранять grammY Context, ViewModel, функции, сервисы или отрендерированные сообщения.
+`StackFrame` содержит только `windowId` и optional navigation data. Максимальная
+глубина stack по умолчанию равна 32 и проверяется до `go()`.
 
-Базовые операции навигации:
+## 5. Instance transitions
 
-```ts
-navigation.go("edit");
-navigation.replace("success");
-navigation.back();
-navigation.reset("overview");
-instance.close(result);
-```
+Навигация отделена от I/O в `InstanceTransitions`:
 
-Глубина stack должна иметь настраиваемое ограничение.
+- `go` добавляет frame;
+- `replace` заменяет верхний frame;
+- `back` удаляет frame или закрывает instance в корне;
+- `reset` создаёт новый корневой frame;
+- `close` переводит instance в closed и сохраняет result.
 
-## 4. Несколько активных instances
+Transitions валидируют window reference и stack limit, но не работают с Telegram
+или storage.
 
-В одном scope может существовать несколько независимых instances:
+## 6. Scope, access и identity
 
-```text
-profile:123       → message 1001
-checkout:abc      → message 1015
-notification:42   → message 1020
-```
-
-Запуск получает пользовательский ключ и collision mode:
-
-```ts
-await ctx.dialog.start(checkoutDialog, {
-  key: `checkout:${cartId}`,
-  mode: "create", // create | reuse | replace
-});
-```
-
-Callbacks однозначно адресуют instance. Для обычных сообщений используется input routing strategy. Несколько instances могут быть активны одновременно, но неадресованный input не должен случайно обрабатываться всеми.
-
-## 5. Dialogless windows
-
-Dialogless Window использует тот же Window runtime, но не имеет Dialog definition и навигационного графа.
-
-```ts
-const handle = await ctx.ui.show(orderCardWindow, {
-  key: `order:${order.id}`,
-  data: { orderId: order.id },
-});
-
-await handle.refresh();
-await handle.replace(otherWindow);
-await handle.close();
-```
-
-Модель:
+Scope отвечает за принадлежность состояния:
 
 ```text
-Dialog Window       = Window + navigation + persisted instance
-Dialogless Window   = Window + standalone instance
-Static message      = Window без instance после отправки
+member  → chat + user
+chat    → chat
+topic   → chat + message thread
+custom  → application resolver
 ```
 
-Интерактивное dialogless-окно сохраняет instance, чтобы callbacks продолжали работать после рестарта.
-
-## 6. Подключение к grammY
-
-Основной lifecycle устанавливается одним middleware:
-
-```ts
-const plugin = dialogs({
-  list: [
-    profileDialog,
-    checkoutDialog,
-    notificationWindow,
-  ],
-  storage,
-  callbacks: callbacks.opaque(),
-  i18n,
-});
-
-bot.use(plugin);
-```
-
-`list` принимает Dialog definitions и самостоятельные dialogless Window definitions. Окна внутри Dialog регистрируются рекурсивно.
-
-Результат `dialogs()` предполагается совместимым с `MiddlewareFn` и одновременно предоставляет runtime для фоновых задач:
-
-```ts
-type DialogPlugin<C> = MiddlewareFn<C> & {
-  runtime: DialogRuntime<C>;
-};
-```
-
-Middleware обрабатывает известные dialog callbacks и подходящий input. Остальные updates передаются в `next()`.
-
-## 7. Стратегии
-
-Стратегии разделяются на независимые политики.
-
-### Scope
-
-Отвечает на вопрос: чьё это состояние?
-
-```ts
-scope: scopes.member(); // chat + user
-scope: scopes.chat();   // общий instance чата
-scope: scopes.topic();  // chat + forum topic
-scope: scopes.custom(ctx => ({ ... }));
-```
-
-### Access
-
-Отвечает на вопрос: кто может воздействовать на instance?
-
-```ts
-access: access.owner();
-access: access.everyone();
-access: access.chatAdministrators();
-access: access.custom(async context => true);
-```
-
-Scope и access не объединяются: общий chat-scoped Dialog может быть доступен всем или только создателю/администраторам.
-
-### Input routing
-
-Отвечает на вопрос: какому instance передать обычное сообщение?
-
-```ts
-input: inputs.reply();
-input: inputs.focused();
-input: inputs.replyOrFocused();
-input: inputs.custom(router);
-```
-
-Для групп default-кандидат — `replyOrFocused`. Focus хранится отдельно для каждого участника чата.
-
-При неоднозначности безопасный default — отклонить input, а не обработать его несколькими instances.
-
-### Presentation
-
-Отвечает на вопрос: как применить новый render к Telegram surface?
-
-```ts
-presentation: presentations.edit({ fallback: "replace" });
-presentation: presentations.replace();
-presentation: presentations.send();
-presentation: presentations.auto();
-```
-
-### Close
-
-Отвечает на вопрос: что оставить после закрытия instance?
-
-```ts
-close: closeStrategies.delete();
-close: closeStrategies.keep();
-close: closeStrategies.detach();
-close: close.replaceWith(closedWindow);
-```
-
-Стратегии разрешаются по иерархии:
+Access отвечает за взаимодействие с уже созданным instance:
 
 ```text
-runtime defaults → Dialog → Window → start/show options
+owner                 только создатель
+everyone              любой actor того же чата
+chatAdministrators    creator/administrator по данным Telegram
+custom                 application predicate
 ```
 
-Декларативный DSL также убирает безопасный boilerplate: статическое окно получает
-пустой ViewModel, identity-ViewModel может состоять только из `initialState`, первое
-окно Dialog становится `initial`, input вызывает одноимённый с его `id` intent, а
-версия состояния keyboard widget равна `1`. Значения, меняющие смысл определения
-(`id`, action, media source), не выводятся неявно.
+Scope и access не объединяются. Например, chat-scoped poll может быть доступен
+всем, а chat-scoped moderation dialog — только администраторам.
 
-### DialogKit composition
+### Keyed identity
 
-Высокоуровневый `DialogKit<C, Services>` связывает типы приложения один раз и
-immutable накапливает три именованных каталога: `widgets`, `dialogs`, `windows`.
-Расширение является чистым переиспользуемым contribution и не создаёт grammY Bot.
-Обычные ресурсы приложения не являются extensions и собираются через `compose`:
+`start/show` могут получить `key`. Полная identity состоит из:
 
 ```text
-defineDialogExtension / kit.extension
-                ↓
-          kit.use(extension)
-                ↓
- dialog(id, nested builder) + standalone windows
-                ↓
-          kit.compose(resources)
-                ↓
- typed catalogs + validated resources
-                ↓
-        kit.middleware(options)
-                ↓
-            grammY Bot
+scopeKey + definitionId + user key
 ```
 
-`kit.middleware()` передаёт собранные resources низкоуровневому runtime, поэтому
-пользователь не дублирует их в `list`. `.use()` возвращает новый kit и немедленно
-проверяет коллизии catalog names, dialog/window ids и initial window references.
-Nested dialog builder предоставляет `viewModel`, `widgets` и локальный `window`;
-локальные ids автоматически получают префикс dialog id.
-Готовые third-party widgets и встроенные primitives находятся в одном
-`kit.widgets`, а `kit.define.widget.*` является DSL для создания новых компонентов.
-Старый `dialogs({ list })` остаётся совместимым низкоуровневым API.
+Отдельная versioned storage-запись связывает identity с instance id. Операции с
+одной identity целиком выполняются внутри `IdentityCoordinator.run()`.
 
-Navigation callback buttons также являются отдельными widgets: `intent`, `go`,
-`switchTo`, `back`, `reset`, `close/cancel`, `url`. Низкоуровневый `button` нужен
-только для custom `ButtonAction`. Для крупных features рекомендуемая файловая
-граница отделяет `view-model.ts` (state/load/intents) от `index.ts` (layout/windows).
+Collision modes:
 
-## 8. Callbacks
+- `create` — ошибка при active collision;
+- `reuse` — access check, focus и rerender существующего instance;
+- `replace` — закрытие существующего и создание нового.
 
-Production callback содержит только непрозрачный случайный token:
+Coordinator обязан быть распределённым, если StorageAdapter разделяется между
+процессами. Runtime не разрешает keyed start/show без coordinator. StorageAdapter
+может предоставить его через поле `identities`, либо приложение передаёт
+`identities` в middleware options.
 
-```text
-gd:Q7qINf4EQLqIUwVZ6GJh9w
-```
+При ошибке initial mount identity освобождается внутри той же critical section.
+После обычного закрытия запись может остаться tombstone: следующий keyed start
+читает instance status и безопасно заменяет её, всё ещё удерживая coordinator.
 
-Рекомендуемый формат — 128 случайных бит в Base64URL. UUID также может поддерживаться стратегией codec.
+## 7. Focus и input routing
 
-Debug mode использует читаемую форму с обязательной проверкой лимита Telegram на размер callback data:
+Callback содержит точный instance token. Обычное сообщение адреса не содержит,
+поэтому focus хранится отдельно для каждого `chat/thread/user` как упорядоченный
+список instance ids.
 
-```text
-gd:profile.overview/edit@3
-```
+Безопасный default `replyOrFocused`:
 
-Callback registry связывает token с:
+1. найти instance по replied-to surface;
+2. иначе принять единственного focused-кандидата;
+3. при нескольких кандидатах не обрабатывать update.
+
+Дополнительно реализованы `reply`, `focused`, `latest`, `oldest`,
+`replyWithFallback` и custom strategy.
+
+Focus commit сериализуется отдельным keyed lock. Если subsequent instance commit
+падает, предыдущий focus snapshot восстанавливается.
+
+## 8. Callbacks и revisions
+
+Production callback data содержит только непрозрачный token. Callback record
+хранит:
 
 ```ts
 interface CallbackRecord {
-  token: string;
   instanceId: string;
-  windowId: string;
-  widgetId: string;
-  actionId: string;
   revision: number;
-  scope: {
-    chatId: number;
-    messageId?: number;
-    allowedUserId?: number;
-  };
-  payload?: unknown;
+  action: ButtonAction;
+  chatId: number;
   expiresAt?: number;
 }
 ```
 
-Random token скрывает внутренний маршрут, но runtime всё равно проверяет chat, message, user/access policy, revision и expiration.
+Перед выполнением проверяются:
 
-Новая revision создаёт новые callbacks. Старые callbacks отзываются после успешного обновления Telegram surface. Поддерживаются TTL и одноразовые callbacks.
+- наличие и TTL callback record;
+- active instance;
+- совпадение revision;
+- chat id и surface message id;
+- текущая access policy.
 
-## 9. Storage
+После успешного события revision увеличивается. Старые callbacks перестают быть
+валидными даже до физического удаления records.
 
-Публичный контракт — стандартный `StorageAdapter` grammY:
+## 9. Выполнение actions
+
+`ActionExecutor` отвечает только за mutation in-memory snapshot:
+
+- загружает View через dialog-level ViewModel;
+- выполняет intent;
+- находит вложенный stateful widget и выполняет его action;
+- делегирует navigation в `InstanceTransitions`.
+
+Он не пишет storage и не вызывает Telegram API. Commit, rerender и recovery
+остаются ответственностью `DialogRuntime`.
+
+## 10. Rendering и surfaces
+
+`WindowRenderer` за один pass разрешает:
+
+1. ViewModel view;
+2. text/translation;
+3. media source;
+4. keyboard tree;
+5. callback records.
+
+`SurfaceManager` применяет render через presentation strategy:
+
+- `auto` — edit совместимого surface, иначе replace;
+- `edit` — edit с configurable fallback;
+- `replace` — новое сообщение с удалением старого;
+- `send` — новое сообщение с detach старой клавиатуры.
+
+Close strategies: `keep`, `detach`, `delete`.
+
+Storage commit является границей успешной операции. При ошибках реализованы
+best-effort компенсации:
+
+- удаление orphan message после неуспешного initial persistence;
+- удаление replacement после неуспешного commit;
+- rollback in-place edit к persisted snapshot;
+- сохранение уже committed replacement при ошибке cleanup.
+
+## 11. Widget tree
+
+Raw keyboard rows и stateful widgets образуют дерево через
+`ui.keyboard.compose(...)`. Renderer рекурсивно объединяет rows.
+
+Состояние widget хранится по mounted `id`:
 
 ```ts
-storage?: StorageAdapter<DialogStorageRecord>;
+widgetStates[id] = { version, value };
 ```
 
-Предварительная схема ключей:
+Правила:
+
+- id обязан быть уникальным в одном rendered keyboard tree;
+- version по умолчанию `1`;
+- при несовпадении version вызывается optional `migrate`;
+- без migration используется `initial(props)`;
+- widget actions используют тот же instance lock и revision lifecycle.
+
+## 12. Типизированные intent references
+
+ViewModel создаёт `actions` из ключей `intents`. Intent reference содержит runtime
+name и type-only параметры Payload/Value. Buttons и inputs принимают reference:
+
+```ts
+ui.button.intent("Open", vm.actions.openUser, {
+  payload: { userId: 42 },
+});
+
+ui.input.photo("avatar", vm.actions.savePhoto);
+```
+
+В persisted callback/input binding остаётся строковое имя; функции и references
+не сохраняются.
+
+## 13. DialogKit
+
+DialogKit — единственный публичный construction API:
 
 ```text
-gd:instance:<instanceId>
-gd:callback:<opaqueToken>
-gd:focus:<chatId>:<userId>
-gd:scope:<scopeHash>
+createDialogKit<C, Services>()
+        ↓
+use(extension) / extend(factory)
+        ↓
+dialog(...) + standalone window(...)
+        ↓
+define(() => resources)
+        ↓
+typed dialogs/windows catalogs
+        ↓
+middleware(options)
 ```
 
-Записи должны быть версионированы и представлены discriminated union.
+Категории:
 
-`StorageAdapter` не гарантирует транзакции или compare-and-swap. Для одного процесса runtime использует lock на уровне instance. Для нескольких процессов может быть предусмотрено необязательное capability-расширение storage с distributed lock/transaction, не ломающее базовую совместимость.
+- `ui.text`, `ui.button`, `ui.input`, `ui.media`, `ui.keyboard` — built-ins;
+- `widgets` — только установленные custom widgets;
+- `widget` — factories для авторов extensions;
+- `scope`, `access`, `presentation`, `close`, `inputRouting` — strategies.
 
-Доступ к адаптеру инкапсулирован в repository. Repository создаёт структурные snapshots на read/write, поэтому корректность runtime не зависит от того, возвращает адаптер копию или ту же ссылку. Distributed consistency, cleanup и атомарные multi-key операции всё ещё требуют проектирования.
+Kit immutable: `use`, `extend` и `define` возвращают новый объект. При композиции
+немедленно проверяются duplicate catalog names, resource ids и initial windows.
 
-## 10. i18n
+Низкоуровневые factories и `dialogs({ list })` остаются внутренними деталями и не
+экспортируются package entrypoint.
 
-Core не зависит от конкретного i18n-движка. Используются независимые адаптеры перевода и определения начального языка.
+## 14. Concurrency и ограничения
 
-```ts
-interface TranslationAdapter {
-  translate(
-    locale: string,
-    key: string,
-    params?: Record<string, unknown>,
-  ): Awaitable<string>;
-}
+Реализованы in-process locks:
 
-interface LocaleResolver<C> {
-  resolve(ctx: C): Awaitable<string>;
-}
-```
+- instance id — сериализация callbacks/input одного instance;
+- focus key — commit/recovery focus;
+- scoped identity — внешний `IdentityCoordinator`, распределённый для shared storage.
 
-Можно поставлять отдельные интеграционные пакеты/entrypoints для Fluent, i18next, `@grammyjs/i18n` и других систем, но ни один из них не является обязательным движком core.
+Instance и focus locks остаются in-process. Identity является исключением:
+create/reuse/replace требуют внешнего distributed coordinator при shared storage.
 
-Locale хранится на stack. Один render pass использует один locale для текста, подписей кнопок и ошибок validation.
+Пока не реализованы:
 
-```ts
-await ctx.dialog.setLocale("pl", {
-  render: "current", // current | all | none
-});
-```
+- distributed locks и атомарные multi-key transactions;
+- albums и multi-message surfaces;
+- автоматический cleanup истёкших callbacks и закрытых instances;
+- migration dialog state между версиями приложения;
+- durable outbox для необратимых Telegram side effects.
 
-Default — немедленно сохранить новый locale и перерендерить текущее окно. Все последующие renders используют новое значение без дополнительной renegotiation.
+## 15. Проверка
 
-Общий chat-scoped stack имеет один общий язык. Для персонального языка в группе используются member-scoped instances.
+`bun run check` последовательно выполняет:
 
-## 11. Widget SDK
+1. основной TypeScript typecheck;
+2. public API type tests;
+3. Bun runtime tests;
+4. declaration/JavaScript build;
+5. package-consumer smoke typecheck.
 
-Поддерживаются четыре основные категории:
-
-```text
-TextWidget
-KeyboardWidget
-MediaWidget
-InputWidget
-```
-
-Цель SDK — позволить сторонним разработчикам создавать полноценные widgets, не работая напрямую с callback codec, storage, revision и Telegram update routing.
-
-### Композиционные widgets
-
-Stateless widget может быть обычной функцией:
-
-```ts
-export function confirmButtons(options: ConfirmOptions) {
-  return row(
-    button(options.confirmText, options.confirmIntent),
-    button(options.cancelText, options.cancelIntent),
-  );
-}
-```
-
-### Stateful widgets
-
-Для widgets с собственным состоянием и событиями используются функциональные factories:
-
-```ts
-export const counter = defineKeyboardWidget<CounterProps, number>()({
-  state: {
-    version: 1,
-    initial: props => props.initial ?? 0,
-  },
-
-  actions: {
-    noop() {},
-
-    decrement({ state, props }) {
-      state.update(value =>
-        Math.max(props.min ?? -Infinity, value - 1),
-      );
-    },
-
-    increment({ state, props }) {
-      state.update(value =>
-        Math.min(props.max ?? Infinity, value + 1),
-      );
-    },
-  },
-
-  render({ state, actions }) {
-    return row(
-      button("−", actions.decrement()),
-      button(String(state.value), actions.noop()),
-      button("+", actions.increment()),
-    );
-  },
-});
-```
-
-Runtime автоматически namespacе-ит widget state, кодирует actions в opaque callbacks, применяет lock, сохраняет состояние и запускает rerender.
-
-Публичный SDK предполагает отдельный стабильный entrypoint:
-
-```ts
-import {
-  defineTextWidget,
-  defineKeyboardWidget,
-  defineMediaWidget,
-  defineInputWidget,
-} from "@ppsh/grammy-dialog/widgets";
-```
-
-Внутренние renderer/storage типы не должны становиться частью Widget API.
-
-## 12. Input widgets
-
-Input widgets не имеют собственного Telegram-представления. Они сопоставляют входящий update, извлекают значение, валидируют его и вызывают intent.
-
-Предполагаемые встроенные widgets:
-
-```text
-textInput, photoInput, videoInput, documentInput,
-audioInput, voiceInput, animationInput, stickerInput,
-contactInput, locationInput, pollInput,
-mediaInput, messageInput
-```
-
-Пример:
-
-```ts
-textInput("name", {
-  trim: true,
-  validate: value =>
-    value.length >= 2
-      ? valid(value)
-      : invalid(t("profile.name-too-short")),
-  onReceive: "nameEntered",
-});
-```
-
-Результат обработки:
-
-```ts
-type InputResult<T> =
-  | { type: "accept"; value: T }
-  | { type: "reject"; message?: TextSource }
-  | { type: "skip" };
-```
-
-- `accept` вызывает intent;
-- `reject` поглощает update и показывает validation error;
-- `skip` передаёт update следующему input widget или middleware.
-
-Custom input создаётся через `defineInputWidget<Props, Value>()` и описывает `match`, `parse`, `validate` и `receive`. Автор widget не занимается маршрутизацией instance и persistence.
-
-Агрегация albums требует отдельного `albumInput` и откладывается после MVP.
-
-## 13. Media widgets и rendering
-
-Media widget декларативно возвращает `MediaSpec`, но не вызывает Telegram API самостоятельно.
-
-```ts
-const productCard = window("product.card", {
-  text: ({ t, vm }) =>
-    t("product.caption", {
-      name: vm.name,
-      price: vm.price,
-    }),
-
-  media: photo(({ vm }) => vm.photoFileId),
-
-  keyboard: [
-    [button(t("cart.add"), "addToCart")],
-  ],
-});
-```
-
-Поддерживаемые источники должны включать Telegram file ID, URL и grammY `InputFile`.
-
-Text автоматически становится caption, если Window содержит media. Пользователь не выбирает вручную между message text и caption.
-
-Renderer строит желаемое состояние:
-
-```ts
-interface RenderedWindow {
-  text?: RenderedText;
-  media?: MediaSpec;
-  keyboard?: RenderedKeyboard;
-  inputs: InputBinding[];
-}
-```
-
-Presentation strategy превращает разницу между текущей Surface и `RenderedWindow` в одну из операций:
-
-```ts
-type SurfaceOperation =
-  | { type: "send" }
-  | { type: "edit-text" }
-  | { type: "edit-caption" }
-  | { type: "edit-media" }
-  | { type: "replace" }
-  | { type: "remove-keyboard" }
-  | { type: "delete" }
-  | { type: "noop" };
-```
-
-Переключение между text-only и media обычно требует replacement. Ошибка редактирования обрабатывается fallback-стратегией.
-
-Media groups создают multi-message surface и требуют отдельной модели для control message. В MVP входят только одиночные media.
-
-## 14. Предполагаемый lifecycle update
-
-```text
-Telegram update
-      ↓
-grammY middleware
-      ↓
-callback codec или input router
-      ↓
-выбор конкретного instance
-      ↓
-instance lock
-      ↓
-load stack, Window и ViewModel
-      ↓
-access check
-      ↓
-handle action/input
-      ↓
-persist state/navigation
-      ↓
-render с одним stack locale
-      ↓
-surface operation
-      ↓
-save surface/revision/callbacks
-```
-
-Текущий порядок side effects использует компенсацию:
-
-- initial send удаляет orphan message, если instance не удалось сохранить;
-- незафиксированный in-place edit возвращается к предыдущему render и callback-набору;
-- при replacement старое сообщение удаляется только после успешного сохранения нового instance;
-- при ошибке replacement persistence новое orphan message удаляется, а старое остаётся активным.
-
-Компенсация является best-effort и не заменяет distributed transaction. Поведение при одновременной недоступности Telegram и storage остаётся открытым вопросом.
-
-## 15. MVP
-
-Первый вертикальный прототип должен включать:
-
-1. `defineWindow`, `defineDialog`, функциональный `defineViewModel`.
-2. Text, inline button и одиночный media output.
-3. Text и одиночный media input.
-4. `start`, `go`, `back`, `replace`, `close`.
-5. Несколько instances.
-6. Dialogless `ui.show`.
-7. Opaque callback registry и debug codec.
-8. Memory storage поверх `StorageAdapter`.
-9. Locale на stack и абстрактный translation adapter.
-10. `defineTextWidget`, `defineKeyboardWidget`, `defineMediaWidget`, `defineInputWidget`.
-11. Тестовый renderer без Telegram API.
-
-До реализации runtime следует сделать type-only прототип на четырёх сценариях:
-
-- профиль с навигацией;
-- общий групповой опрос;
-- dialogless media card;
-- пользовательский stateful Counter или Calendar widget.
-
-## 16. Открытые вопросы
-
-Общее направление архитектуры принято. Требуют уточнения:
-
-1. Вывод типов `State`, `StartData`, `Result`, ViewModel intents и widget payload.
-2. Финальная структура Stack/Frame/widget state.
-3. Storage keys, multi-key consistency, cleanup и multi-process locking.
-4. Точный reconciliation для edit/replace/delete и media transitions.
-5. Recovery, если основная операция и компенсирующая операция завершаются ошибкой одновременно.
-6. TTL callbacks и политика удаления закрытых instances.
-7. Albums, media groups и multi-message surfaces.
-8. Приоритеты нескольких совпавших input widgets.
-9. Версионирование и миграции Dialog, Window и widget state после деплоя.
-10. Финальная форма Widget SDK после проверки на реальных сторонних widgets.
-
-## 17. Текущее состояние реализации
-
-Первый вертикальный MVP реализует:
-
-- grammY middleware и внешний runtime handle;
-- Dialog/Window/ViewModel registry;
-- независимые stacks и несколько instances;
-- dialogless Window;
-- grammY `StorageAdapter` и memory adapter;
-- opaque/debug callback codec, callback records, revision и TTL;
-- intent и widget actions;
-- text, inline keyboard, URL и photo/video/animation/audio/document/voice rendering;
-- auto/edit/replace/send presentation и keep/detach/delete close strategies;
-- text/media/file/sticker/contact/location/message/custom inputs и validation;
-- latest/oldest/reply/custom input routing по упорядоченному focus record v2;
-- locale на stack и translation/locale adapters;
-- member/chat/topic scopes;
-- owner/everyone/custom access policies;
-- factories для text, keyboard, media и input widgets;
-- stateful custom keyboard widgets;
-- локальный instance lock.
-
-Интеграционные тесты покрывают callback rerender, stack navigation, input, i18n/photo, пользовательский stateful widget и общий групповой Dialog.
-
-Код разделён по каталогам `runtime`, `presentation`, `input-routing`, `persistence`, `callbacks`, `policies` и `integration`. Showcase отдельно раскладывает dialogs, standalone windows, widgets, i18n и services. Интеграционные suites покрывают lifecycle, recovery, presentation strategies, несколько focus candidates и расширенные media/input типы.
+Correctness-sensitive изменения callbacks, revisions, access, focus, identity,
+locking и compensation должны сопровождаться отдельными regression tests.

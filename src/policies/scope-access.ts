@@ -15,7 +15,9 @@ export interface ScopeStrategies {
   /** Isolates instances by forum topic and rejects updates outside a topic. */
   topic<C extends Context = Context>(): ScopeStrategy<C>;
   /** Uses an application-defined scope resolver. */
-  custom<C extends Context = Context>(strategy: ScopeStrategy<C>): ScopeStrategy<C>;
+  custom<C extends Context = Context>(
+    strategy: ScopeStrategy<C> | ScopeStrategy<C>["resolve"],
+  ): ScopeStrategy<C>;
 }
 
 /** Built-in dialog scope strategies. */
@@ -53,8 +55,12 @@ export const scopes: ScopeStrategies = {
     };
   },
 
-  custom<C extends Context = Context>(strategy: ScopeStrategy<C>): ScopeStrategy<C> {
-    return strategy;
+  custom<C extends Context = Context>(
+    strategy: ScopeStrategy<C> | ScopeStrategy<C>["resolve"],
+  ): ScopeStrategy<C> {
+    return typeof strategy === "function"
+      ? { id: "custom", resolve: strategy }
+      : strategy;
   },
 };
 
@@ -64,8 +70,12 @@ export interface AccessStrategies {
   owner<C extends Context = Context>(): AccessStrategy<C>;
   /** Allows every actor in the resolved scope. */
   everyone<C extends Context = Context>(): AccessStrategy<C>;
+  /** Allows Telegram chat creators and administrators. */
+  chatAdministrators<C extends Context = Context>(): AccessStrategy<C>;
   /** Uses an application-defined access predicate. */
-  custom<C extends Context = Context>(strategy: AccessStrategy<C>): AccessStrategy<C>;
+  custom<C extends Context = Context>(
+    strategy: AccessStrategy<C> | AccessStrategy<C>["allows"],
+  ): AccessStrategy<C>;
 }
 
 /** Built-in instance access strategies. */
@@ -88,7 +98,22 @@ export const access: AccessStrategies = {
     };
   },
 
-  custom<C extends Context = Context>(strategy: AccessStrategy<C>): AccessStrategy<C> {
-    return strategy;
+  chatAdministrators<C extends Context = Context>(): AccessStrategy<C> {
+    return {
+      id: "chat-administrators",
+      async allows(ctx, instance) {
+        if (ctx.chat?.id !== instance.chatId || ctx.from === undefined) return false;
+        const member = await ctx.getChatMember(ctx.from.id);
+        return member.status === "creator" || member.status === "administrator";
+      },
+    };
+  },
+
+  custom<C extends Context = Context>(
+    strategy: AccessStrategy<C> | AccessStrategy<C>["allows"],
+  ): AccessStrategy<C> {
+    return typeof strategy === "function"
+      ? { id: "custom", allows: strategy }
+      : strategy;
   },
 };

@@ -8,7 +8,7 @@ import {
   viewModel,
   window,
   type DialogStorageRecord,
-} from "../src/index.js";
+} from "../src/internal.js";
 import { JsonStorageAdapter, type TestContext } from "./helpers.js";
 
 function createWindow() {

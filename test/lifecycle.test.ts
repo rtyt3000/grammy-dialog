@@ -12,7 +12,7 @@ import {
   window,
   type CloseStrategy,
   type DialogStorageRecord,
-} from "../src/index.js";
+} from "../src/internal.js";
 import { JsonStorageAdapter, type TestContext } from "./helpers.js";
 
 describe("instance lifecycle", () => {

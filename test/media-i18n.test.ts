@@ -10,7 +10,7 @@ import {
   t,
   viewModel,
   window,
-} from "../src/index.js";
+} from "../src/internal.js";
 import type { TestContext } from "./helpers.js";
 
 describe("media and i18n", () => {

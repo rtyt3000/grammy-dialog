@@ -2,6 +2,7 @@ import type { Context } from "grammy";
 import type { Message } from "grammy/types";
 import type { Awaitable } from "./common.js";
 import type { TextSource } from "./rendering.js";
+import type { IntentReference } from "./view-model.js";
 
 /** Successful input validation with the normalized value passed to the intent. */
 export interface InputValidationSuccess<Value> { readonly ok: true; readonly value: Value; }
@@ -30,15 +31,19 @@ export interface TextInputDefinition {
 }
 
 /** Shared options for binding an input to a ViewModel intent. */
-export interface InputBindingOptions {
+export interface InputBindingOptions<Value = unknown> {
   /** Intent name; defaults to the input widget id. */
-  readonly onReceive?: string;
+  readonly onReceive?: string | IntentReference<any, Value>;
+}
+
+function intentName(reference: string | IntentReference<any, any>): string {
+  return typeof reference === "string" ? reference : reference.name;
 }
 
 /** Creates a text input; trimming is disabled and `onReceive` defaults to `id`. */
 export function textInput(
   id: string,
-  options: InputBindingOptions & {
+  options: InputBindingOptions<string> & {
     trim?: boolean;
     validate?: TextInputDefinition["validate"];
   } = {},
@@ -47,7 +52,7 @@ export function textInput(
     kind: "text",
     id,
     trim: options.trim ?? false,
-    onReceive: options.onReceive ?? id,
+    onReceive: intentName(options.onReceive ?? id),
     validate: options.validate,
   };
 }
@@ -71,8 +76,11 @@ export interface PhotoInputDefinition {
 }
 
 /** Creates a photo input whose receive intent defaults to its id. */
-export function photoInput(id: string, options: InputBindingOptions = {}): PhotoInputDefinition {
-  return { kind: "photo", id, onReceive: options.onReceive ?? id };
+export function photoInput(
+  id: string,
+  options: InputBindingOptions<PhotoInputValue> = {},
+): PhotoInputDefinition {
+  return { kind: "photo", id, onReceive: intentName(options.onReceive ?? id) };
 }
 
 /** Common Telegram file metadata normalized by attachment inputs. */
@@ -137,32 +145,32 @@ export interface AttachmentInputDefinition<Kind extends AttachmentInputKind = At
   readonly onReceive: string;
 }
 
-function attachmentInput<Kind extends AttachmentInputKind>(
+function attachmentInput<Kind extends AttachmentInputKind, Value>(
   kind: Kind,
   id: string,
-  options: InputBindingOptions,
+  options: InputBindingOptions<Value>,
 ): AttachmentInputDefinition<Kind> {
-  return { kind, id, onReceive: options.onReceive ?? id };
+  return { kind, id, onReceive: intentName(options.onReceive ?? id) };
 }
 
 /** Creates a video input whose receive intent defaults to its id. */
-export function videoInput(id: string, options: InputBindingOptions = {}): AttachmentInputDefinition<"video"> { return attachmentInput("video", id, options); }
+export function videoInput(id: string, options: InputBindingOptions<VideoInputValue> = {}): AttachmentInputDefinition<"video"> { return attachmentInput("video", id, options); }
 /** Creates an animation input whose receive intent defaults to its id. */
-export function animationInput(id: string, options: InputBindingOptions = {}): AttachmentInputDefinition<"animation"> { return attachmentInput("animation", id, options); }
+export function animationInput(id: string, options: InputBindingOptions<AnimationInputValue> = {}): AttachmentInputDefinition<"animation"> { return attachmentInput("animation", id, options); }
 /** Creates an audio input whose receive intent defaults to its id. */
-export function audioInput(id: string, options: InputBindingOptions = {}): AttachmentInputDefinition<"audio"> { return attachmentInput("audio", id, options); }
+export function audioInput(id: string, options: InputBindingOptions<AudioInputValue> = {}): AttachmentInputDefinition<"audio"> { return attachmentInput("audio", id, options); }
 /** Creates a document input whose receive intent defaults to its id. */
-export function documentInput(id: string, options: InputBindingOptions = {}): AttachmentInputDefinition<"document"> { return attachmentInput("document", id, options); }
+export function documentInput(id: string, options: InputBindingOptions<FileInputValue> = {}): AttachmentInputDefinition<"document"> { return attachmentInput("document", id, options); }
 /** Creates a voice input whose receive intent defaults to its id. */
-export function voiceInput(id: string, options: InputBindingOptions = {}): AttachmentInputDefinition<"voice"> { return attachmentInput("voice", id, options); }
+export function voiceInput(id: string, options: InputBindingOptions<VoiceInputValue> = {}): AttachmentInputDefinition<"voice"> { return attachmentInput("voice", id, options); }
 /** Creates a sticker input whose receive intent defaults to its id. */
-export function stickerInput(id: string, options: InputBindingOptions = {}): AttachmentInputDefinition<"sticker"> { return attachmentInput("sticker", id, options); }
+export function stickerInput(id: string, options: InputBindingOptions<StickerInputValue> = {}): AttachmentInputDefinition<"sticker"> { return attachmentInput("sticker", id, options); }
 /** Creates a contact input whose receive intent defaults to its id. */
-export function contactInput(id: string, options: InputBindingOptions = {}): AttachmentInputDefinition<"contact"> { return attachmentInput("contact", id, options); }
+export function contactInput(id: string, options: InputBindingOptions<ContactInputValue> = {}): AttachmentInputDefinition<"contact"> { return attachmentInput("contact", id, options); }
 /** Creates a location input whose receive intent defaults to its id. */
-export function locationInput(id: string, options: InputBindingOptions = {}): AttachmentInputDefinition<"location"> { return attachmentInput("location", id, options); }
+export function locationInput(id: string, options: InputBindingOptions<LocationInputValue> = {}): AttachmentInputDefinition<"location"> { return attachmentInput("location", id, options); }
 /** Creates a raw message input whose receive intent defaults to its id. */
-export function messageInput(id: string, options: InputBindingOptions = {}): AttachmentInputDefinition<"message"> { return attachmentInput("message", id, options); }
+export function messageInput(id: string, options: InputBindingOptions<MessageInputValue> = {}): AttachmentInputDefinition<"message"> { return attachmentInput("message", id, options); }
 
 /** Definition produced by a user-defined input widget. */
 export interface CustomInputDefinition<C extends Context = Context, Value = unknown> {

@@ -8,24 +8,31 @@ import type {
 import type { DialogPlugin } from "../integration/grammy-plugin.js";
 import type { DialogRuntimeOptions } from "../runtime/contracts.js";
 import type { DialogDefinitionDsl, WidgetDefinitionDsl } from "./definition-dsl.js";
+import type { BuiltInUiCatalog } from "./built-in-widgets.js";
+import type { AccessStrategies, ScopeStrategies } from "../policies/scope-access.js";
+import type { InputRoutingStrategies } from "../input-routing/strategies.js";
+import type {
+  CloseStrategies,
+  PresentationStrategies,
+} from "../presentation/strategies.js";
 
 /** Named collection of widgets exposed through `kit.widgets`. */
 export type WidgetCatalog = Readonly<Record<string, unknown>>;
 
 /** Named collection of dialogs exposed through `kit.dialogs`. */
-export type DialogCatalog = Readonly<Record<string, DialogDefinition<any>>>;
+export type DialogCatalog = Readonly<Record<string, DialogDefinition<any, any, any, any>>>;
 
 /** Named collection of standalone windows exposed through `kit.windows`. */
 export type WindowCatalog = Readonly<Record<string, WindowDefinition<any, any, any, any>>>;
 
-/** Named resources returned by `kit.compose()`. */
+/** Named resources returned by `kit.define()`. */
 export type ResourceCatalog = Readonly<Record<string, DialogResource<any>>>;
 
 /** Dialog entries extracted from a mixed resource catalog. */
 export type DialogsFrom<Resources extends ResourceCatalog> = {
-  readonly [Name in keyof Resources as Resources[Name] extends DialogDefinition<any>
+  readonly [Name in keyof Resources as Resources[Name] extends DialogDefinition<any, any, any, any>
     ? Name
-    : never]: Extract<Resources[Name], DialogDefinition<any>>;
+    : never]: Extract<Resources[Name], DialogDefinition<any, any, any, any>>;
 };
 
 /** Standalone-window entries extracted from a mixed resource catalog. */
@@ -64,8 +71,11 @@ export interface DialogExtensionContext<
 > extends DialogDefinitionDsl<C, Services, Widgets> {
   /** Widgets already installed in the kit on which the extension is defined. */
   readonly widgets: Widgets;
-  /** Low-level factories for creating reusable widgets. */
-  readonly define: WidgetDefinitionDsl;
+  readonly ui: BuiltInUiCatalog;
+  readonly scope: ScopeStrategies;
+  readonly access: AccessStrategies;
+  /** Factories for declaring reusable custom widgets. */
+  readonly widget: WidgetDefinitionDsl["widget"];
 }
 
 /** Runtime options whose resource list is supplied by the kit. */
@@ -86,9 +96,15 @@ export interface DialogKit<
   Windows extends WindowCatalog = {},
 > extends DialogDefinitionDsl<C, Services, Widgets> {
   readonly widgets: Widgets;
+  readonly ui: BuiltInUiCatalog;
+  readonly scope: ScopeStrategies;
+  readonly access: AccessStrategies;
+  readonly presentation: PresentationStrategies;
+  readonly close: CloseStrategies;
+  readonly inputRouting: InputRoutingStrategies;
   readonly dialogs: Dialogs;
   readonly windows: Windows;
-  readonly define: WidgetDefinitionDsl;
+  readonly widget: WidgetDefinitionDsl["widget"];
   readonly resources: ReadonlyArray<DialogResource<C>>;
 
   /** Defines a reusable extension against the types and widgets of this kit. */
@@ -140,7 +156,7 @@ export interface DialogKit<
    * Adds ordinary application dialogs and standalone windows without treating
    * each resource as a plugin extension. The returned object is partitioned by kind.
    */
-  compose<Resources extends ResourceCatalog>(
+  define<Resources extends ResourceCatalog>(
     factory: (context: DialogExtensionContext<C, Services, Widgets>) => Resources,
   ): DialogKit<
     C,

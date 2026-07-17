@@ -4,27 +4,29 @@ import { prepareBot } from "grammy-testing";
 import {
   createDialogKit,
   defineDialogExtension,
-} from "../src/index.js";
+} from "../src/internal.js";
 import type { TestContext } from "./helpers.js";
 
 describe("DialogKit", () => {
   test("collects extension resources and creates middleware without a list", async () => {
-    const counterExtension = defineDialogExtension(({ define }) => ({
+    const counterExtension = defineDialogExtension(({ ui }) => ({
       widgets: {
-        label: (value: string) => [[define.button(value, "noop")]],
+        label: (value: string) => [[ui.button.raw(value, "noop")]],
       },
     }));
     const dsl = createDialogKit<TestContext>().use(counterExtension);
-    const dialog = dsl.dialog("kit-dialog", ({ window, widgets }) => ({
-      windows: {
+    const dialogVm = dsl.viewModel({ initialState: {} });
+    const dialog = dsl.dialog("kit-dialog", {
+      viewModel: dialogVm,
+      windows: ({ window, widgets }) => ({
         main: window("main", {
           text: "Registered dialog",
           keyboard: widgets.label("Action"),
         }),
-      },
-    }));
+      }),
+    });
     const notice = dsl.window("kit.notice", { text: "Registered window" });
-    const kit = dsl.compose(() => ({ dialog, notice }));
+    const kit = dsl.define(() => ({ dialog, notice }));
     const bot = new Bot<TestContext>("test-token");
 
     bot.use(kit.middleware({}));
@@ -53,15 +55,16 @@ describe("DialogKit", () => {
     const first = dsl.window("duplicate-window", { text: "First" });
     const second = dsl.window("duplicate-window", { text: "Second" });
 
-    expect(() => dsl.compose(() => ({ first, second })))
+    expect(() => dsl.define(() => ({ first, second })))
       .toThrow("Duplicate window id: duplicate-window");
   });
 
   test("allows a standalone extension to contribute a nested dialog without a bot", () => {
-    const extension = defineDialogExtension(({ dialog }) => {
-      const help = dialog("plugin-help", ({ window }) => ({
-        windows: { main: window("main", { text: "Plugin help" }) },
-      }));
+    const extension = defineDialogExtension(({ dialog, viewModel }) => {
+      const help = dialog("plugin-help", {
+        viewModel: viewModel({ initialState: {} }),
+        windows: ({ window }) => ({ main: window("main", { text: "Plugin help" }) }),
+      });
       return { dialogs: { help } };
     });
     const kit = createDialogKit().use(extension);

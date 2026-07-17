@@ -5,7 +5,7 @@ import { counterCard } from "./windows/counter-card.js";
 import { reportReadyWindow } from "./windows/report-ready.js";
 
 /** Complete immutable catalog used by the showcase middleware and commands. */
-export const appDialogs = dialogDsl.compose(() => ({
+export const appDialogs = dialogDsl.define(() => ({
   profile: profileDialog,
   teamPoll: teamPollDialog,
   counterCard,

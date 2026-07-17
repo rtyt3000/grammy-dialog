@@ -4,14 +4,9 @@ import type {
 } from "grammy";
 import {
   type AccessStrategy,
-  type Awaitable,
-  type ButtonAction,
   type DialogDefinition,
   type LocaleResolver,
-  type NavigationController,
   type ScopeStrategy,
-  StateHandle,
-  type TranslationAdapter,
   type WindowDefinition,
 } from "../core.js";
 import {
@@ -22,6 +17,7 @@ import {
 import {
   type CallbackRecord,
   type DialogStorageRecord,
+  type IdentityCoordinator,
   type InstanceRecord,
   MemoryStorageAdapter,
 } from "../persistence/storage.js";
@@ -32,21 +28,17 @@ import { KeyedLocks } from "./keyed-locks.js";
 import { WindowRenderer } from "./window-renderer.js";
 import { SurfaceManager } from "./surface-manager.js";
 import { InputMatcher } from "./input-matcher.js";
-import { PresentationPlanner } from "../presentation/planner.js";
 import {
   closeStrategies,
   presentations,
 } from "../presentation/strategies.js";
-import type {
-  CloseStrategy,
-  PresentationStrategy,
-} from "../presentation/contracts.js";
 import { inputRouting } from "../input-routing/strategies.js";
 import type { InputRoutingStrategy } from "../input-routing/contracts.js";
 import { FocusManager } from "./focus-manager.js";
+import { InstanceTransitions } from "./instance-transitions.js";
+import { ActionExecutor } from "./action-executor.js";
 import type {
   DialogController,
-  DialogFlavor,
   DialogRuntimeOptions,
   InstanceHandle,
   ShowOptions,
@@ -76,13 +68,18 @@ export class DialogRuntime<
   private readonly inputRouting: InputRoutingStrategy<C>;
   private readonly locks = new KeyedLocks();
   private readonly focus: FocusManager;
+  private readonly transitions: InstanceTransitions;
+  private readonly actions: ActionExecutor<C, Services>;
+  private readonly identities?: IdentityCoordinator;
 
   /** Creates a runtime and normalizes all storage, codec, locale, and policy defaults. */
   public constructor(options: DialogRuntimeOptions<C, Services>) {
     const storage = options.storage ?? new MemoryStorageAdapter<DialogStorageRecord>();
+    this.identities = options.identities ?? this.storageIdentityCoordinator(storage);
     this.repository = new DialogRepository(storage);
     this.focus = new FocusManager(this.repository);
     this.registry = new DefinitionRegistry(options.list);
+    this.transitions = new InstanceTransitions(this.registry, options.maxStackDepth ?? 32);
     this.services = options.services as Services;
     this.codec = "encode" in (options.callbacks ?? {})
       ? options.callbacks as CallbackCodec
@@ -97,15 +94,21 @@ export class DialogRuntime<
       translator: options.i18n?.adapter,
       callbackTtlMs: options.callbackTtlMs ?? 7 * 24 * 60 * 60 * 1000,
     });
+    this.actions = new ActionExecutor(
+      this.registry,
+      this.renderer,
+      this.services,
+      this.transitions,
+    );
     this.surfaces = new SurfaceManager(
       this.renderer,
       this.repository,
-      new PresentationPlanner(options.defaults?.presentation ?? presentations.auto()),
+      options.defaults?.presentation ?? presentations.auto(),
       options.defaults?.close ?? closeStrategies.detach(),
     );
     this.defaultScope = options.defaults?.scope ?? scopes.member<C>();
     this.defaultAccess = options.defaults?.access ?? access.owner<C>();
-    this.inputRouting = options.defaults?.inputRouting ?? inputRouting.latest<C>();
+    this.inputRouting = options.defaults?.inputRouting ?? inputRouting.replyOrFocused<C>();
   }
 
   /** Creates the `ctx.dialog` controller bound to an incoming update. */
@@ -132,7 +135,7 @@ export class DialogRuntime<
   /** Resolves scope and locale, persists, and mounts a new dialog instance. */
   public async start(
     ctx: C,
-    dialogReference: string | DialogDefinition<any>,
+    dialogReference: string | DialogDefinition<any, any, any, any>,
     options: StartOptions = {},
   ): Promise<InstanceHandle> {
     if (ctx.chat === undefined) throw new Error("Cannot start a dialog without a chat");
@@ -147,16 +150,14 @@ export class DialogRuntime<
       chatId: scope.chatId,
       threadId: scope.threadId,
       scopeKey: scope.key,
+      key: options.key,
       ownerId: ctx.from?.id,
       locale,
       data: options.data,
-      state: initial.viewModel.initialState(),
+      state: dialog.viewModel.initialState(),
     });
 
-    await this.focus.commit(instance, instance.ownerId, () =>
-      this.surfaces.mount(ctx.api, instance, ctx)
-    );
-    return { id: instance.id };
+    return this.mountWithIdentity(instance, options.mode ?? "create", ctx.api, ctx);
   }
 
   /** Persists and mounts an independent standalone-window instance. */
@@ -178,16 +179,14 @@ export class DialogRuntime<
       scopeKey: options.threadId === undefined
         ? String(options.chatId)
         : `${options.chatId}:${options.threadId}`,
+      key: options.key,
       ownerId: options.actorId,
       locale,
       data: options.data,
       state: selectedWindow.viewModel.initialState(),
     });
 
-    await this.focus.commit(instance, instance.ownerId, () =>
-      this.surfaces.mount(options.api!, instance, ctx)
-    );
-    return { id: instance.id };
+    return this.mountWithIdentity(instance, options.mode ?? "create", options.api, ctx);
   }
 
   /** Handles a callback owned by this runtime and reports whether it was consumed. */
@@ -241,7 +240,14 @@ export class DialogRuntime<
         return true;
       }
 
-      await this.executeIntent(ctx, instance, selectedWindow, matched.intent, undefined, matched.value);
+      await this.actions.intent(
+        ctx,
+        instance,
+        selectedWindow,
+        matched.intent,
+        undefined,
+        matched.value,
+      );
       await this.finishUpdate(ctx.api, instance, ctx);
       return true;
     });
@@ -268,6 +274,7 @@ export class DialogRuntime<
     ownerId?: number;
     threadId?: number;
     scopeKey: string;
+    key?: string;
     locale: string;
     data?: unknown;
     state: unknown;
@@ -280,6 +287,7 @@ export class DialogRuntime<
       chatId: options.chatId,
       threadId: options.threadId,
       scopeKey: options.scopeKey,
+      key: options.key,
       stack: [{ windowId: options.windowId, data: options.data }],
       state: options.state,
       locale: options.locale,
@@ -291,31 +299,102 @@ export class DialogRuntime<
     };
   }
 
+  private async mountWithIdentity(
+    instance: InstanceRecord,
+    mode: "create" | "reuse" | "replace",
+    api: Api,
+    ctx?: C,
+  ): Promise<InstanceHandle> {
+    if (instance.key === undefined) {
+      await this.focus.commit(instance, instance.ownerId, () =>
+        this.surfaces.mount(api, instance, ctx)
+      );
+      return { id: instance.id };
+    }
+
+    const identities = this.identities;
+    if (identities === undefined) {
+      throw new Error(
+        "Keyed instances require a distributed identity coordinator in middleware options",
+      );
+    }
+    const lockKey = `identity:${instance.scopeKey}:${instance.definitionId}:${instance.key}`;
+    return identities.run(lockKey, async () => {
+      const existingId = await this.repository.readIdentity(
+        instance.scopeKey,
+        instance.definitionId,
+        instance.key!,
+      );
+      const existing = existingId === undefined
+        ? undefined
+        : await this.repository.readInstance(existingId);
+      const active = existing?.status === "active" ? existing : undefined;
+
+      if (active !== undefined && mode === "create") {
+        throw new Error(
+          `Active instance already exists for key '${instance.key}' in scope '${instance.scopeKey}'`,
+        );
+      }
+      if (active !== undefined && mode === "reuse") {
+        await this.locks.run(active.id, async () => {
+          const current = await this.repository.readInstance(active.id);
+          if (current === undefined || current.status !== "active") {
+            throw new Error(`Keyed instance '${active.id}' became inactive during reuse`);
+          }
+          const selectedWindow = this.registry.currentWindow(current);
+          if (ctx !== undefined && !await this.canAccess(ctx, current, selectedWindow)) {
+            throw new Error(`Access denied for existing instance '${current.id}'`);
+          }
+          current.revision += 1;
+          await this.focus.commit(current, ctx?.from?.id ?? instance.ownerId, () =>
+            this.surfaces.rerender(api, current, ctx)
+          );
+        });
+        return { id: active.id };
+      }
+      if (active !== undefined) {
+        await this.locks.run(active.id, async () => {
+          const current = await this.repository.readInstance(active.id);
+          if (current === undefined || current.status !== "active") return;
+          this.transitions.controller(current).close();
+          await this.finishUpdate(api, current, ctx);
+        });
+      }
+
+      await this.repository.writeIdentity(
+        instance.scopeKey,
+        instance.definitionId,
+        instance.key!,
+        instance.id,
+      );
+      try {
+        await this.focus.commit(instance, instance.ownerId, () =>
+          this.surfaces.mount(api, instance, ctx)
+        );
+      } catch (error) {
+        await this.repository.deleteIdentityIfOwned(
+          instance.scopeKey,
+          instance.definitionId,
+          instance.key!,
+          instance.id,
+        );
+        throw error;
+      }
+      return { id: instance.id };
+    });
+  }
+
   private async processAction(ctx: C, callback: CallbackRecord): Promise<void> {
     const instance = await this.repository.readInstance(callback.instanceId);
     if (instance === undefined || instance.status !== "active") return;
     if (callback.expiresAt !== undefined && callback.expiresAt < Date.now()) return;
     if (callback.revision !== instance.revision) return;
     if (callback.chatId !== ctx.chat?.id) return;
-    if (callback.allowedUserId !== undefined && callback.allowedUserId !== ctx.from?.id) return;
     if (instance.surface?.messageId !== ctx.callbackQuery?.message?.message_id) return;
 
     const selectedWindow = this.registry.currentWindow(instance);
     if (!await this.canAccess(ctx, instance, selectedWindow)) return;
-    if (callback.action.kind === "intent") {
-      await this.executeIntent(
-        ctx,
-        instance,
-        selectedWindow,
-        callback.action.name,
-        callback.action.payload,
-        undefined,
-      );
-    } else if (callback.action.kind === "widget") {
-      await this.executeWidgetAction(ctx, instance, selectedWindow, callback.action);
-    } else {
-      this.applyNavigation(instance, callback.action);
-    }
+    await this.actions.execute(ctx, instance, selectedWindow, callback.action);
     if (instance.status === "active") {
       await this.focus.commit(instance, ctx.from?.id, () =>
         this.finishUpdate(ctx.api, instance, ctx)
@@ -323,74 +402,6 @@ export class DialogRuntime<
     } else {
       await this.finishUpdate(ctx.api, instance, ctx);
     }
-  }
-
-  private async executeIntent(
-    ctx: C,
-    instance: InstanceRecord,
-    selectedWindow: AnyWindow<C>,
-    name: string,
-    payload: unknown,
-    value: unknown,
-  ): Promise<void> {
-    const handler = selectedWindow.viewModel.intents[name];
-    if (handler === undefined) throw new Error(`Unknown intent '${name}' in window '${selectedWindow.id}'`);
-    const state = this.stateHandle(instance);
-    const vm = await selectedWindow.viewModel.load({
-      ctx,
-      state: state.value,
-      services: this.services,
-      actor: { id: ctx.from?.id, chatId: instance.chatId },
-    });
-    await handler({
-      ctx,
-      state,
-      vm,
-      services: this.services,
-      navigation: this.navigation(instance),
-      payload,
-      value,
-    });
-  }
-
-  private applyNavigation(instance: InstanceRecord, action: ButtonAction): void {
-    if (action.kind === "intent" || action.kind === "widget") return;
-    const navigation = this.navigation(instance);
-    switch (action.kind) {
-      case "go": navigation.go(action.windowId, action.data); break;
-      case "replace": navigation.replace(action.windowId, action.data); break;
-      case "back": navigation.back(); break;
-      case "reset": navigation.reset(action.windowId, action.data); break;
-      case "close": navigation.close(action.result); break;
-    }
-  }
-
-  private navigation(instance: InstanceRecord): NavigationController {
-    return {
-      go: (windowId, data) => {
-        const resolved = this.registry.resolveForInstance(instance, windowId);
-        this.registry.window(resolved);
-        instance.stack.push({ windowId: resolved, data });
-      },
-      replace: (windowId, data) => {
-        const resolved = this.registry.resolveForInstance(instance, windowId);
-        this.registry.window(resolved);
-        instance.stack[instance.stack.length - 1] = { windowId: resolved, data };
-      },
-      back: () => {
-        if (instance.stack.length > 1) instance.stack.pop();
-        else instance.status = "closed";
-      },
-      reset: (windowId, data) => {
-        const resolved = this.registry.resolveForInstance(instance, windowId);
-        this.registry.window(resolved);
-        instance.stack = [{ windowId: resolved, data }];
-      },
-      close: result => {
-        instance.status = "closed";
-        instance.result = result;
-      },
-    };
   }
 
   private async finishUpdate(api: Api, instance: InstanceRecord, ctx?: C): Promise<void> {
@@ -423,44 +434,18 @@ export class DialogRuntime<
     await this.surfaces.rerender(api, instance, ctx);
   }
 
-  private async executeWidgetAction(
-    ctx: C,
-    instance: InstanceRecord,
-    selectedWindow: AnyWindow<C>,
-    action: Extract<ButtonAction, { kind: "widget" }>,
-  ): Promise<void> {
-    if (selectedWindow.keyboard === undefined) {
-      throw new Error(`Widget '${action.widgetId}' is not present in window '${selectedWindow.id}'`);
-    }
-    const renderContext = await this.renderer.createContext(instance, selectedWindow, ctx);
-    const node = typeof selectedWindow.keyboard === "function"
-      ? await selectedWindow.keyboard(renderContext)
-      : selectedWindow.keyboard;
-    if (!this.renderer.isKeyboardWidget(node) || node.id !== action.widgetId) {
-      throw new Error(`Widget '${action.widgetId}' is not present in window '${selectedWindow.id}'`);
-    }
-    const handler = node.definition.actions[action.action];
-    if (handler === undefined) {
-      throw new Error(`Unknown action '${action.action}' in widget '${action.widgetId}'`);
-    }
-    await handler({
-      ctx,
-      props: node.props,
-      state: this.renderer.widgetState(instance, node),
-      services: this.services,
-      navigation: this.navigation(instance),
-      payload: action.payload,
-    });
-  }
-
   private async resolveLocale(ctx: C): Promise<string> {
     return this.localeResolver?.resolve(ctx) ?? this.defaultLocale;
   }
 
-  private stateHandle(instance: InstanceRecord): StateHandle<any> {
-    return new StateHandle(instance.state, state => {
-      instance.state = state;
-    });
+  private storageIdentityCoordinator(
+    storage: object,
+  ): IdentityCoordinator | undefined {
+    if (!("identities" in storage)) return undefined;
+    const identities = (storage as { identities?: unknown }).identities;
+    return typeof identities === "object" && identities !== null && "run" in identities
+      ? identities as IdentityCoordinator
+      : undefined;
   }
 
   private messageThreadId(ctx: C): number | undefined {

@@ -16,13 +16,13 @@ export interface WindowDefinition<
 > {
   readonly kind: "window";
   readonly id: string;
+  /** Standalone state owner or the inherited dialog ViewModel normalized by DialogKit. */
   readonly viewModel: ViewModelDefinition<State, View, C, Services>;
   readonly text?: TextSource<C, View, Services>;
   readonly parseMode?: ParseMode;
   readonly media?: MediaSource<C, View, Services>;
   readonly keyboard?: KeyboardSource<C, View, Services>;
   readonly input?: ReadonlyArray<InputDefinition<C>>;
-  readonly scope?: ScopeStrategy<C>;
   readonly access?: AccessStrategy<C>;
 }
 
@@ -53,11 +53,18 @@ export function window(
 }
 
 /** Declarative group of windows sharing one navigation stack. */
-export interface DialogDefinition<C extends Context = Context> {
+export interface DialogDefinition<
+  C extends Context = Context,
+  State = unknown,
+  View = unknown,
+  Services = unknown,
+> {
   readonly kind: "dialog";
   readonly id: string;
   readonly initial: string;
-  readonly windows: Readonly<Record<string, WindowDefinition<C, any, any, any>>>;
+  /** The single state owner shared by every window in this dialog. */
+  readonly viewModel: ViewModelDefinition<State, View, C, Services>;
+  readonly windows: Readonly<Record<string, WindowDefinition<C, State, View, Services>>>;
   readonly scope?: ScopeStrategy<C>;
   readonly access?: AccessStrategy<C>;
 }
@@ -68,13 +75,19 @@ export interface DialogDefinition<C extends Context = Context> {
  * When `initial` is omitted, the first key in `windows` is used.
  * @throws When no initial window can be resolved.
  */
-export function defineDialog<C extends Context = Context>(definition: {
+export function defineDialog<
+  C extends Context = Context,
+  State = unknown,
+  View = unknown,
+  Services = unknown,
+>(definition: {
   id: string;
   initial?: string;
-  windows: Readonly<Record<string, WindowDefinition<C, any, any, any>>>;
+  viewModel: ViewModelDefinition<State, View, C, Services>;
+  windows: Readonly<Record<string, WindowDefinition<C, State, View, Services>>>;
   scope?: ScopeStrategy<C>;
   access?: AccessStrategy<C>;
-}): DialogDefinition<C> {
+}): DialogDefinition<C, State, View, Services> {
   const initial = definition.initial ?? Object.keys(definition.windows)[0];
   if (initial === undefined) {
     throw new Error(`Dialog '${definition.id}' must contain at least one window`);
@@ -84,5 +97,5 @@ export function defineDialog<C extends Context = Context>(definition: {
 
 /** A full dialog or a standalone window accepted by the runtime registry. */
 export type DialogResource<C extends Context = Context> =
-  | DialogDefinition<C>
+  | DialogDefinition<C, any, any, any>
   | WindowDefinition<C, any, any, any>;

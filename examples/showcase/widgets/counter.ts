@@ -1,10 +1,10 @@
 import { defineDialogExtension } from "@ppsh/grammy-dialog";
 
 /** Third-party-style extension contributing a stateful counter widget. */
-export const counterExtension = defineDialogExtension(({ define }) => {
-  const counter = define.widget.keyboard<{ step?: number }, number>()({
+export const counterExtension = defineDialogExtension(({ widget, ui }) => {
+  const counter = widget.keyboard({
     state: {
-      initial: () => 0,
+      initial: (_props: { step?: number }) => 0,
     },
     actions: {
       decrement({ state, props }) {
@@ -16,9 +16,9 @@ export const counterExtension = defineDialogExtension(({ define }) => {
     },
     render({ state, actions }) {
       return [[
-        define.button("−", actions.decrement()),
-        define.button(String(state.value), actions.increment()),
-        define.button("+", actions.increment()),
+        ui.button.raw("−", actions.decrement()),
+        ui.button.raw(String(state.value), actions.increment()),
+        ui.button.raw("+", actions.increment()),
       ]];
     },
   });

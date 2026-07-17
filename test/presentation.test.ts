@@ -9,7 +9,7 @@ import {
   window,
   type DialogStorageRecord,
   type PresentationStrategy,
-} from "../src/index.js";
+} from "../src/internal.js";
 import { JsonStorageAdapter, type TestContext } from "./helpers.js";
 
 function createBot(

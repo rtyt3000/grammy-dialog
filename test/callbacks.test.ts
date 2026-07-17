@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Bot } from "grammy";
+import { Bot, type StorageAdapter } from "grammy";
 import { prepareBot } from "grammy-testing";
 import {
   button,
@@ -8,8 +8,61 @@ import {
   viewModel,
   window,
   type DialogStorageRecord,
-} from "../src/index.js";
+} from "../src/internal.js";
 import { JsonStorageAdapter, type TestContext } from "./helpers.js";
+
+class BlockingCallbackStorage implements StorageAdapter<DialogStorageRecord> {
+  public readonly identities: JsonStorageAdapter<DialogStorageRecord>["identities"];
+  private blocked?: {
+    readonly seen: () => void;
+    readonly released: Promise<void>;
+  };
+  private release?: () => void;
+
+  public constructor(
+    private readonly delegate: JsonStorageAdapter<DialogStorageRecord>,
+  ) {
+    this.identities = delegate.identities;
+  }
+
+  public read(
+    key: string,
+  ): DialogStorageRecord | undefined | Promise<DialogStorageRecord | undefined> {
+    const value = this.delegate.read(key);
+    if (!key.startsWith("gd:callback:") || this.blocked === undefined) return value;
+    const blocked = this.blocked;
+    this.blocked = undefined;
+    blocked.seen();
+    return blocked.released.then(() => value);
+  }
+
+  public write(key: string, value: DialogStorageRecord): void {
+    this.delegate.write(key, value);
+  }
+
+  public delete(key: string): void {
+    this.delegate.delete(key);
+  }
+
+  public blockNextCallbackRead(): Promise<void> {
+    let seen!: () => void;
+    let release!: () => void;
+    const waiting = new Promise<void>(resolve => {
+      seen = resolve;
+    });
+    const released = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    this.blocked = { seen, released };
+    this.release = release;
+    return waiting;
+  }
+
+  public releaseCallbackRead(): void {
+    this.release?.();
+    this.release = undefined;
+  }
+}
 
 function counterDialog() {
   const counterVm = viewModel({
@@ -26,7 +79,12 @@ function counterDialog() {
     text: ({ vm }) => `Count: ${vm.count}`,
     keyboard: [[button("Increment", "increment")]],
   });
-  return defineDialog({ id: "counter", initial: "main", windows: { main } });
+  return defineDialog({
+    id: "counter",
+    initial: "main",
+    viewModel: counterVm,
+    windows: { main },
+  });
 }
 
 function createCounterBot(storage: JsonStorageAdapter<DialogStorageRecord>) {
@@ -126,5 +184,39 @@ describe("callbacks", () => {
 
     const edit = second.chats.outgoing.requests.find(request => request.method === "editMessageText");
     expect((edit?.payload as { text?: string } | undefined)?.text).toBe("Count: 1");
+  });
+
+  test("invalidates a callback read before keyed reuse rerenders", async () => {
+    const backing = new JsonStorageAdapter<DialogStorageRecord>();
+    const storage = new BlockingCallbackStorage(backing);
+    const dialog = counterDialog();
+    const bot = new Bot<TestContext>("test-token");
+    bot.use(dialogs<TestContext>({ list: [dialog], storage }));
+    bot.command("counter", ctx => ctx.dialog.start(dialog, {
+      key: "primary",
+      mode: "create",
+    }));
+    bot.command("reuse", ctx => ctx.dialog.start(dialog, {
+      key: "primary",
+      mode: "reuse",
+    }));
+    const { chats } = await prepareBot(bot);
+    const user = chats.newUser();
+    await user.sendCommand("counter");
+    const reply = user.replies.lastOrThrow();
+    const callbackRead = storage.blockNextCallbackRead();
+    const staleClick = reply.clickButton("Increment");
+    await callbackRead;
+
+    await user.sendCommand("reuse");
+    storage.releaseCallbackRead();
+    await staleClick;
+
+    const instance = [...backing.readAllValues()]
+      .find(record => record.type === "instance");
+    expect(instance?.type === "instance" ? instance.value.revision : undefined).toBe(1);
+    expect(instance?.type === "instance" ? instance.value.state : undefined)
+      .toEqual({ count: 0 });
+    expect(chats.editsFor(user)).toHaveLength(1);
   });
 });

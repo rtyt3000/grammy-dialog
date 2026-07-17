@@ -7,7 +7,7 @@ import {
 } from "../core.js";
 import { dialogs } from "../integration/grammy-plugin.js";
 import { DefinitionRegistry } from "../runtime/definition-registry.js";
-import { builtInWidgets, type BuiltInWidgetCatalog } from "./built-in-widgets.js";
+import { builtInUi } from "./built-in-widgets.js";
 import type {
   DialogCatalog,
   DialogExtension,
@@ -23,6 +23,9 @@ import {
   type WindowFactory,
 } from "./definition-dsl.js";
 import { freezeContribution } from "./extension.js";
+import { access, scopes } from "../policies/scope-access.js";
+import { inputRouting } from "../input-routing/strategies.js";
+import { closeStrategies, presentations } from "../presentation/strategies.js";
 
 function mergeCatalog(
   kind: string,
@@ -50,7 +53,7 @@ function buildDialogKit<
 ): DialogKit<C, Services, Widgets, Dialogs, Windows> {
   const viewModel = createViewModelFactory<C, Services>();
   const windowFactory = window as WindowFactory<C, Services>;
-  const dialogFactory = createDialogFactory(viewModel, windowFactory, widgets);
+  const dialogFactory = createDialogFactory(windowFactory, widgets, builtInUi);
   const resources = Object.freeze([
     ...Object.values(registeredDialogs),
     ...Object.values(registeredWindows),
@@ -63,9 +66,15 @@ function buildDialogKit<
     window: windowFactory,
     dialog: dialogFactory,
     widgets,
+    ui: builtInUi,
+    scope: scopes,
+    access,
+    presentation: presentations,
+    close: closeStrategies,
+    inputRouting,
     dialogs: registeredDialogs,
     windows: registeredWindows,
-    define: widgetDefinitionDsl,
+    widget: widgetDefinitionDsl.widget,
     resources,
 
     extension(factory, options = {}) {
@@ -76,7 +85,10 @@ function buildDialogKit<
           window: windowFactory,
           dialog: dialogFactory,
           widgets,
-          define: widgetDefinitionDsl,
+          ui: builtInUi,
+          scope: scopes,
+          access,
+          widget: widgetDefinitionDsl.widget,
         } as DialogExtensionContext<C, Services, Widgets>)),
       });
     },
@@ -98,15 +110,18 @@ function buildDialogKit<
       return kit.use(kit.extension(factory, options));
     },
 
-    compose(factory) {
+    define(factory) {
       const catalog = factory({
         viewModel,
         window: windowFactory,
         dialog: dialogFactory,
         widgets,
-        define: widgetDefinitionDsl,
+        ui: builtInUi,
+        scope: scopes,
+        access,
+        widget: widgetDefinitionDsl.widget,
       });
-      const addedDialogs: Record<string, DialogDefinition<any>> = {};
+      const addedDialogs: Record<string, DialogDefinition<any, any, any, any>> = {};
       const addedWindows: Record<string, WindowDefinition<any, any, any, any>> = {};
       for (const [name, resource] of Object.entries(catalog)) {
         if (resource.kind === "dialog") addedDialogs[name] = resource;
@@ -128,13 +143,13 @@ function buildDialogKit<
   return Object.freeze(kit);
 }
 
-/** Creates an empty application-bound DialogKit with all built-in widgets. */
+/** Creates an empty application-bound DialogKit with categorized built-in UI. */
 export function createDialogKit<
   C extends Context = Context,
   Services = unknown,
->(): DialogKit<C, Services, BuiltInWidgetCatalog> {
-  return buildDialogKit<C, Services, BuiltInWidgetCatalog, {}, {}>(
-    builtInWidgets,
+>(): DialogKit<C, Services, {}> {
+  return buildDialogKit<C, Services, {}, {}, {}>(
+    Object.freeze({}),
     Object.freeze({}),
     Object.freeze({}),
   );

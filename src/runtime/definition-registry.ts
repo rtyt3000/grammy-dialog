@@ -2,6 +2,7 @@ import type { Context } from "grammy";
 import type {
   DialogDefinition,
   DialogResource,
+  ViewModelDefinition,
   WindowDefinition,
 } from "../core.js";
 import type { InstanceRecord } from "../persistence/storage.js";
@@ -11,7 +12,7 @@ export type AnyWindow<C extends Context> = WindowDefinition<C, any, any, any>;
 
 /** Resolves registered dialogs, standalone windows, and dialog-local aliases. */
 export class DefinitionRegistry<C extends Context = Context> {
-  private readonly dialogs = new Map<string, DialogDefinition<C>>();
+  private readonly dialogs = new Map<string, DialogDefinition<C, any, any, any>>();
   private readonly windows = new Map<string, AnyWindow<C>>();
 
   public constructor(resources: ReadonlyArray<DialogResource<C>>) {
@@ -19,7 +20,7 @@ export class DefinitionRegistry<C extends Context = Context> {
   }
 
   /** Resolves a dialog id or returns the supplied definition. */
-  public dialog(reference: string | DialogDefinition<any>): DialogDefinition<C> {
+  public dialog(reference: string | DialogDefinition<any, any, any, any>): DialogDefinition<C, any, any, any> {
     const id = typeof reference === "string" ? reference : reference.id;
     const dialog = this.dialogs.get(id);
     if (dialog === undefined) throw new Error(`Unknown dialog: ${id}`);
@@ -27,7 +28,7 @@ export class DefinitionRegistry<C extends Context = Context> {
   }
 
   /** Finds a dialog without throwing when it is not registered. */
-  public findDialog(id: string): DialogDefinition<C> | undefined {
+  public findDialog(id: string): DialogDefinition<C, any, any, any> | undefined {
     return this.dialogs.get(id);
   }
 
@@ -46,6 +47,22 @@ export class DefinitionRegistry<C extends Context = Context> {
     return this.window(frame.windowId);
   }
 
+  /** Resolves the state owner for a dialog or standalone window instance. */
+  public viewModel(
+    instance: InstanceRecord,
+    selectedWindow = this.currentWindow(instance),
+  ): ViewModelDefinition<any, any, C, any> {
+    if (instance.kind === "dialog") {
+      const dialog = this.dialogs.get(instance.definitionId);
+      if (dialog === undefined) throw new Error(`Unknown dialog: ${instance.definitionId}`);
+      return dialog.viewModel;
+    }
+    if (selectedWindow.viewModel === undefined) {
+      throw new Error(`Standalone window '${selectedWindow.id}' has no ViewModel`);
+    }
+    return selectedWindow.viewModel;
+  }
+
   /** Resolves a window reference relative to an instance's dialog definition. */
   public resolveForInstance(instance: InstanceRecord, reference: string): string {
     if (instance.kind !== "dialog") return reference;
@@ -54,7 +71,10 @@ export class DefinitionRegistry<C extends Context = Context> {
   }
 
   /** Resolves either a dialog-local key or a globally registered window id. */
-  public resolveDialogWindow(dialog: DialogDefinition<C>, reference: string): string {
+  public resolveDialogWindow(
+    dialog: DialogDefinition<C, any, any, any>,
+    reference: string,
+  ): string {
     return dialog.windows[reference]?.id ?? reference;
   }
 
