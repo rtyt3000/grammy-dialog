@@ -1,0 +1,4 @@
+interface:
+  display_name: "Use grammy-dialog"
+  short_description: "Build typed Telegram dialogs with DialogKit"
+  default_prompt: "Use $use-grammy-dialog to build a type-safe grammY dialog flow with DialogKit."

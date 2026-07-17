@@ -1,5 +1,7 @@
 # grammy-dialog
 
+[![Agent Skill](https://skills.sh/b/rtyt3000/grammy-dialog)](https://skills.sh/rtyt3000/grammy-dialog)
+
 Экспериментальная TypeScript-библиотека декларативных Telegram-интерфейсов для
 [grammY](https://grammy.dev/). DialogKit связывает типы контекста и сервисов,
 описывает Dialog/Window/ViewModel, собирает расширения и создаёт middleware.
@@ -23,6 +25,43 @@ import {
   type DialogFlavor,
 } from "@ppsh/grammy-dialog";
 ```
+
+## AI Agent Skill
+
+Репозиторий содержит переносимый
+[Agent Skill](https://agentskills.io/specification) для разработки интерфейсов
+на `@ppsh/grammy-dialog`. Установщик [`skills`](https://skills.sh/docs/cli)
+поддерживает Claude Code, Cursor, Codex, GitHub Copilot, Gemini CLI, OpenCode и
+другие совместимые агенты.
+
+Установка через pnpm:
+
+```bash
+pnpm dlx skills add rtyt3000/grammy-dialog --skill use-grammy-dialog
+```
+
+Или через npm:
+
+```bash
+npx skills add rtyt3000/grammy-dialog --skill use-grammy-dialog
+```
+
+По умолчанию CLI определит доступные агенты и предложит место установки. Для
+глобальной установки добавьте `--global`, а нужные агенты можно указать явно:
+
+```bash
+pnpm dlx skills add rtyt3000/grammy-dialog \
+  --skill use-grammy-dialog \
+  --global \
+  --agent claude-code \
+  --agent cursor \
+  --agent codex \
+  --agent github-copilot
+```
+
+После установки попросите агента использовать `use-grammy-dialog` либо опишите
+задачу естественным языком, например: «Создай chat-scoped опрос на
+`@ppsh/grammy-dialog`». Способ явного вызова зависит от конкретного агента.
 
 ## Быстрый старт
 
