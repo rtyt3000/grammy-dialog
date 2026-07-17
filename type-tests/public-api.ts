@@ -1,6 +1,7 @@
 import type { Context } from "grammy";
 import {
   button,
+  createViewModelFactory,
   defineDialog,
   intent,
   valid,
@@ -30,6 +31,36 @@ interface Services {
 type BotContext = Context & DialogFlavor;
 type ProfileState = { name: string; visits: number };
 type ProfileView = { title: string; visits: number };
+
+const appViewModel = createViewModelFactory<BotContext, Services>();
+const factoryVm = appViewModel({
+  initialState: (): ProfileState => ({ name: "Ada", visits: 0 }),
+  load: ({ state, services }) => ({
+    title: `${state.name}: ${services.users}`,
+    visits: state.visits,
+  }),
+  intents: {
+    visit({ state }) {
+      state.update(current => ({ ...current, visits: current.visits + 1 }));
+    },
+  },
+});
+type FactoryView = typeof factoryVm extends import("../mod.ts").ViewModelDefinition<
+  any,
+  infer View,
+  any,
+  any
+> ? View : never;
+type _FactoryViewIsInferred = Expect<Equal<FactoryView, ProfileView>>;
+
+appViewModel({
+  initialState: { count: 0 },
+  intents: {
+    increment({ state }) {
+      state.update(current => ({ count: current.count + 1 }));
+    },
+  },
+});
 
 const profileVm = viewModel<ProfileState, ProfileView, BotContext, Services>({
   initialState: { name: "Ada", visits: 0 },

@@ -30,7 +30,105 @@ import { defineKeyboardWidget } from "@ppsh/grammy-dialog/widgets";
 - простое создание сторонних text, keyboard, media и input widgets;
 - совместимость с хранилищами экосистемы grammY.
 
-## Предполагаемое подключение
+## DialogKit и расширения
+
+Рекомендуемый API собирает типы, widgets, dialogs и standalone windows в одном
+immutable kit. Расширения не создают `Bot` и не имеют runtime side effects:
+
+```ts
+const dsl = createDialogKit<AppContext, AppServices>();
+
+const calendarExtension = defineDialogExtension(({ define }) => {
+  const calendar = define.widget.keyboard<CalendarProps, CalendarState>()({
+    state: { initial: () => ({}) },
+    actions: { /* ... */ },
+    render: () => [],
+  });
+
+  return { widgets: { calendar } };
+});
+
+const appDsl = dsl.use(calendarExtension);
+
+const profile = appDsl.dialog(
+  "profile",
+  ({ viewModel, window, widgets }) => {
+    const vm = viewModel({
+      initialState: (): ProfileState => ({}),
+      load: ({ state, services }) => ({
+        name: state.name ?? services.profiles.fallbackName,
+      }),
+    });
+    const main = window("main", {
+      viewModel: vm,
+      input: [
+        widgets.textInput("saveName"),
+        widgets.calendar({ id: "birthday" }),
+      ],
+    });
+    return { windows: { main } };
+  },
+);
+
+const report = appDsl.window("report", { text: "Ready" });
+const appDialogs = appDsl.compose(() => ({ profile, report }));
+```
+
+`dialog(id, builder)` создаёт ViewModel и окна внутри границы диалога. Локальный
+`window("main", ...)` автоматически получает runtime id `profile.main`. Обычные
+ресурсы приложения собираются одним `.compose()` и не оформляются как extensions.
+
+Готовые и сторонние компоненты доступны из одного типизированного каталога:
+
+```ts
+appDialogs.widgets.textInput(...);
+appDialogs.widgets.calendar(...);
+appDialogs.dialogs.profile;
+```
+
+Callback buttons представлены отдельными семантическими widgets, поэтому обычно
+не требуется вручную собирать action object:
+
+```ts
+widgets.intent("Save", "saveProfile");
+widgets.go("Details", "details");
+widgets.switchTo("Summary", "summary");
+widgets.back("Back");
+widgets.reset("Home", "main");
+widgets.close("Close");
+widgets.cancel("Cancel");
+widgets.url("Documentation", "https://example.com");
+```
+
+`widgets.button(text, action)` остаётся низкоуровневым escape hatch. Имена
+`switchTo` и `cancel` являются удобными aliases для replace-current и close.
+
+ViewModel рекомендуется хранить отдельно от декларации окон:
+
+```text
+dialogs/
+  profile/
+    index.ts        dialog layout и windows
+    view-model.ts   state, load и intents
+```
+
+Nested dialog builder по-прежнему предоставляет `viewModel` для небольших локальных
+диалогов, но не требует определять ViewModel непосредственно внутри callback.
+
+Middleware создаётся один раз и автоматически получает собранный список ресурсов:
+
+```ts
+bot.use(appDialogs.middleware({ storage, services, i18n }));
+bot.command("profile", ctx =>
+  ctx.dialog.start(appDialogs.dialogs.profile),
+);
+```
+
+`.use()` возвращает новый kit. Коллизии имён каталога, resource id и неверные initial
+windows проверяются во время композиции — для установки расширения экземпляр бота
+не нужен. Низкоуровневый `dialogs({ list })` остаётся доступен для прямого использования.
+
+## Низкоуровневое подключение
 
 ```ts
 import { Bot, type Context } from "grammy";

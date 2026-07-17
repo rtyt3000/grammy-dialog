@@ -284,6 +284,43 @@ runtime defaults → Dialog → Window → start/show options
 версия состояния keyboard widget равна `1`. Значения, меняющие смысл определения
 (`id`, action, media source), не выводятся неявно.
 
+### DialogKit composition
+
+Высокоуровневый `DialogKit<C, Services>` связывает типы приложения один раз и
+immutable накапливает три именованных каталога: `widgets`, `dialogs`, `windows`.
+Расширение является чистым переиспользуемым contribution и не создаёт grammY Bot.
+Обычные ресурсы приложения не являются extensions и собираются через `compose`:
+
+```text
+defineDialogExtension / kit.extension
+                ↓
+          kit.use(extension)
+                ↓
+ dialog(id, nested builder) + standalone windows
+                ↓
+          kit.compose(resources)
+                ↓
+ typed catalogs + validated resources
+                ↓
+        kit.middleware(options)
+                ↓
+            grammY Bot
+```
+
+`kit.middleware()` передаёт собранные resources низкоуровневому runtime, поэтому
+пользователь не дублирует их в `list`. `.use()` возвращает новый kit и немедленно
+проверяет коллизии catalog names, dialog/window ids и initial window references.
+Nested dialog builder предоставляет `viewModel`, `widgets` и локальный `window`;
+локальные ids автоматически получают префикс dialog id.
+Готовые third-party widgets и встроенные primitives находятся в одном
+`kit.widgets`, а `kit.define.widget.*` является DSL для создания новых компонентов.
+Старый `dialogs({ list })` остаётся совместимым низкоуровневым API.
+
+Navigation callback buttons также являются отдельными widgets: `intent`, `go`,
+`switchTo`, `back`, `reset`, `close/cancel`, `url`. Низкоуровневый `button` нужен
+только для custom `ButtonAction`. Для крупных features рекомендуемая файловая
+граница отделяет `view-model.ts` (state/load/intents) от `index.ts` (layout/windows).
+
 ## 8. Callbacks
 
 Production callback содержит только непрозрачный случайный token:

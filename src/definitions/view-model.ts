@@ -52,6 +52,45 @@ export interface ViewModelDefinition<
   readonly intents: Intents;
 }
 
+/**
+ * Context-bound ViewModel factory that avoids repeating application context and
+ * service types in every ViewModel definition.
+ */
+export interface ViewModelFactory<C extends Context, Services> {
+  /** Creates an identity ViewModel whose view is its state. */
+  <
+    State,
+    Intents extends Record<string, IntentHandler<C, State, State, Services>> = {},
+  >(definition: {
+    initialState: State | (() => State);
+    load?: undefined;
+    intents?: Intents & Record<string, IntentHandler<C, State, State, Services>>;
+  }): ViewModelDefinition<State, State, C, Services, Intents>;
+
+  /** Creates a ViewModel with an inferred custom view. */
+  <
+    State,
+    View,
+    Intents extends Record<string, IntentHandler<C, State, View, Services>> = Record<
+      string,
+      IntentHandler<C, State, View, Services>
+    >,
+  >(definition: {
+    initialState?: State | (() => State);
+    load: (context: ViewModelLoadContext<C, State, Services>) => Awaitable<View>;
+    intents?: Intents & Record<string, IntentHandler<C, State, View, Services>>;
+  }): ViewModelDefinition<State, View, C, Services, Intents>;
+}
+
+/** Creates a ViewModel factory preconfigured with application context and services. */
+export function createViewModelFactory<
+  C extends Context = Context,
+  Services = unknown,
+>(): ViewModelFactory<C, Services> {
+  return ((definition: Parameters<typeof viewModel>[0]) => viewModel(definition)) as unknown as
+    ViewModelFactory<C, Services>;
+}
+
 /** Creates an empty identity ViewModel for a static or stateless window. */
 export function viewModel(): ViewModelDefinition<{}, {}, Context, unknown, {}>;
 /** Creates an identity ViewModel whose rendered view is its current state. */

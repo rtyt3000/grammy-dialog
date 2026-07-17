@@ -1,24 +1,27 @@
-import { button } from "@ppsh/grammy-dialog";
-import { defineKeyboardWidget } from "@ppsh/grammy-dialog/widgets";
+import { defineDialogExtension } from "@ppsh/grammy-dialog";
 
-/** Stateful counter widget whose increment step defaults to one. */
-export const counterWidget = defineKeyboardWidget<{ step?: number }, number>()({
-  state: {
-    initial: () => 0,
-  },
-  actions: {
-    decrement({ state, props }) {
-      state.update(value => value - (props.step ?? 1));
+/** Third-party-style extension contributing a stateful counter widget. */
+export const counterExtension = defineDialogExtension(({ define }) => {
+  const counter = define.widget.keyboard<{ step?: number }, number>()({
+    state: {
+      initial: () => 0,
     },
-    increment({ state, props }) {
-      state.update(value => value + (props.step ?? 1));
+    actions: {
+      decrement({ state, props }) {
+        state.update(value => value - (props.step ?? 1));
+      },
+      increment({ state, props }) {
+        state.update(value => value + (props.step ?? 1));
+      },
     },
-  },
-  render({ state, actions }) {
-    return [[
-      button("−", actions.decrement()),
-      button(String(state.value), actions.increment()),
-      button("+", actions.increment()),
-    ]];
-  },
-});
+    render({ state, actions }) {
+      return [[
+        define.button("−", actions.decrement()),
+        define.button(String(state.value), actions.increment()),
+        define.button("+", actions.increment()),
+      ]];
+    },
+  });
+
+  return { widgets: { counter } };
+}, { name: "counter" });

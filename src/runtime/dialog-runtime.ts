@@ -132,7 +132,7 @@ export class DialogRuntime<
   /** Resolves scope and locale, persists, and mounts a new dialog instance. */
   public async start(
     ctx: C,
-    dialogReference: string | DialogDefinition,
+    dialogReference: string | DialogDefinition<any>,
     options: StartOptions = {},
   ): Promise<InstanceHandle> {
     if (ctx.chat === undefined) throw new Error("Cannot start a dialog without a chat");
@@ -161,7 +161,7 @@ export class DialogRuntime<
 
   /** Persists and mounts an independent standalone-window instance. */
   public async show(
-    windowReference: string | WindowDefinition,
+    windowReference: string | WindowDefinition<any, any, any, any>,
     options: ShowOptions,
     ctx?: C,
   ): Promise<InstanceHandle> {

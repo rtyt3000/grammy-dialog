@@ -1,4 +1,5 @@
 export * from "./definitions/actions.js";
+export * from "./definitions/button-widgets.js";
 export * from "./definitions/common.js";
 export * from "./definitions/i18n.js";
 export * from "./definitions/input.js";

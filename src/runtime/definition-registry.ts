@@ -19,7 +19,7 @@ export class DefinitionRegistry<C extends Context = Context> {
   }
 
   /** Resolves a dialog id or returns the supplied definition. */
-  public dialog(reference: string | DialogDefinition): DialogDefinition<C> {
+  public dialog(reference: string | DialogDefinition<any>): DialogDefinition<C> {
     const id = typeof reference === "string" ? reference : reference.id;
     const dialog = this.dialogs.get(id);
     if (dialog === undefined) throw new Error(`Unknown dialog: ${id}`);
@@ -32,7 +32,7 @@ export class DefinitionRegistry<C extends Context = Context> {
   }
 
   /** Resolves a window id or returns the supplied definition. */
-  public window(reference: string | WindowDefinition): AnyWindow<C> {
+  public window(reference: string | WindowDefinition<any, any, any, any>): AnyWindow<C> {
     const id = typeof reference === "string" ? reference : reference.id;
     const selectedWindow = this.windows.get(id);
     if (selectedWindow === undefined) throw new Error(`Unknown window: ${id}`);

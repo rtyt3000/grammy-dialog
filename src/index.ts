@@ -1,16 +1,21 @@
 export {
   back,
+  backButton,
   animation,
   animationInput,
   audio,
   audioInput,
   button,
   close,
+  closeButton,
+  createViewModelFactory,
   defineDialog,
   document,
   documentInput,
   go,
+  goButton,
   intent,
+  intentButton,
   invalid,
   contactInput,
   locationInput,
@@ -18,7 +23,9 @@ export {
   photo,
   photoInput,
   replace,
+  replaceButton,
   reset,
+  resetButton,
   t,
   textInput,
   stickerInput,
@@ -31,6 +38,7 @@ export {
   voiceInput,
   window,
   type Awaitable,
+  type ActionButtonOptions,
   type AccessInstance,
   type AccessStrategy,
   type AnimationDefinition,
@@ -50,6 +58,7 @@ export {
   type DocumentDefinition,
   type FileInputValue,
   type InputValidation,
+  type IntentButtonOptions,
   type IntentContext,
   type KeyboardDefinition,
   type KeyboardNode,
@@ -63,6 +72,7 @@ export {
   type MediaKind,
   type MessageInputValue,
   type NavigationController,
+  type NavigationButtonOptions,
   type PhotoInputValue,
   type RenderContext,
   type ScopeResolution,
@@ -73,6 +83,7 @@ export {
   type VideoDefinition,
   type VideoInputValue,
   type ViewModelDefinition,
+  type ViewModelFactory,
   type WindowDefinition,
   type WidgetAction,
   type WidgetActionContext,
@@ -80,6 +91,7 @@ export {
   type VoiceDefinition,
   type VoiceInputValue,
   type StickerInputValue,
+  type CloseButtonOptions,
 } from "./core.js";
 export {
   defineKeyboardLayout,
@@ -153,3 +165,30 @@ export type {
   InputRoutingContext,
   InputRoutingStrategy,
 } from "./input-routing/contracts.js";
+export { createDialogKit } from "./kit/dialog-kit.js";
+export {
+  defineDialogExtension,
+  type StandaloneExtensionContext,
+} from "./kit/extension.js";
+export type {
+  DialogCatalog,
+  DialogExtension,
+  DialogExtensionContext,
+  DialogExtensionContribution,
+  DialogKit,
+  DialogKitMiddlewareOptions,
+  DialogsFrom,
+  ResourceCatalog,
+  WidgetCatalog,
+  WindowsFrom,
+  WindowCatalog,
+} from "./kit/contracts.js";
+export type {
+  DialogDefinitionDsl,
+  DialogBuilderContext,
+  DialogBuilderResult,
+  DialogFactory,
+  WidgetDefinitionDsl,
+  WindowFactory,
+} from "./kit/definition-dsl.js";
+export type { BuiltInWidgetCatalog } from "./kit/built-in-widgets.js";
