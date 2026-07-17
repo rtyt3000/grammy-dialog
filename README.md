@@ -7,7 +7,9 @@
 ## Установка
 
 ```bash
-npm install @ppsh/grammy-dialog grammy
+npmx jsr add @ppsh/grammy-dialog 
+# or 
+npm install jsr:@ppsh/grammy-dialog
 ```
 
 Пакет публикует основной entrypoint и отдельный Widget SDK:
