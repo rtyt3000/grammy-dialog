@@ -4,12 +4,15 @@ import type { Chat, User } from "grammy/types";
 import { prepareBot } from "grammy-testing";
 import {
   access,
-  button,
+  Button,
   defineDialog,
   dialogs,
   go,
+  Keyboard,
+  Row,
   scopes,
   textInput,
+  Text,
   viewModel,
   window,
   type DialogStorageRecord,
@@ -22,18 +25,26 @@ function sharedDialog() {
     load: ({ state }) => state,
     intents: {
       setValue({ state, value }) {
-        state.update(current => ({ ...current, value: String(value) }));
+        state.update((current) => ({ ...current, value: String(value) }));
       },
     },
   });
   const main = window("shared.main", {
     viewModel: sharedVm,
-    text: "Shared",
-    keyboard: [[button("Enter value", go("input"))]],
+    view: (
+      <>
+        <Text>Shared</Text>
+        <Keyboard>
+          <Row>
+            <Button action={go("input")}>Enter value</Button>
+          </Row>
+        </Keyboard>
+      </>
+    ),
   });
   const input = window("shared.input", {
     viewModel: sharedVm,
-    text: ({ vm }) => `Value: ${vm.value}`,
+    view: ({ vm }) => <Text>Value: {vm.value}</Text>,
     input: [textInput("value", { onReceive: "setValue" })],
   });
   return defineDialog({
@@ -49,7 +60,7 @@ function sharedDialog() {
 function createSharedBot(storage?: JsonStorageAdapter<DialogStorageRecord>) {
   const bot = new Bot<TestContext>("test-token");
   bot.use(dialogs<TestContext>({ list: [sharedDialog()], storage }));
-  bot.command("shared", ctx => ctx.dialog.start("shared"));
+  bot.command("shared", (ctx) => ctx.dialog.start("shared"));
   return bot;
 }
 
@@ -92,7 +103,9 @@ describe("group dialogs", () => {
 
     expect(chats.editsFor(member).lastOrThrow().text).toBe("Value: none");
     await member.sendText("from member", { chat: group });
-    expect(chats.editsFor(member).lastOrThrow().text).toBe("Value: from member");
+    expect(chats.editsFor(member).lastOrThrow().text).toBe(
+      "Value: from member",
+    );
   });
 
   test("does not commit an action when focus preparation fails", async () => {
@@ -108,15 +121,25 @@ describe("group dialogs", () => {
     const reply = group.messages.last!;
     storage.failNextWrite("gd:focus:");
 
-    await expect(clickAs(bot, group, member, reply, 999_002))
-      .rejects.toThrow("storage write failed");
+    await expect(clickAs(bot, group, member, reply, 999_002)).rejects.toThrow(
+      "storage write failed",
+    );
 
-    const instance = [...storage.readAllValues()].find(record => record.type === "instance");
-    expect(instance?.type === "instance" ? instance.value.revision : undefined).toBe(0);
-    expect(instance?.type === "instance" ? instance.value.stack.at(-1)?.windowId : undefined)
-      .toBe("shared.main");
+    const instance = [...storage.readAllValues()].find(
+      (record) => record.type === "instance",
+    );
+    expect(
+      instance?.type === "instance" ? instance.value.revision : undefined,
+    ).toBe(0);
+    expect(
+      instance?.type === "instance"
+        ? instance.value.stack.at(-1)?.windowId
+        : undefined,
+    ).toBe("shared.main");
 
-    await expect(clickAs(bot, group, member, reply, 999_003)).resolves.toBeUndefined();
+    await expect(
+      clickAs(bot, group, member, reply, 999_003),
+    ).resolves.toBeUndefined();
     expect(chats.editsFor(member).lastOrThrow().text).toBe("Value: none");
   });
 
@@ -133,14 +156,23 @@ describe("group dialogs", () => {
     const reply = group.messages.last!;
     storage.failNextWrite("gd:instance:");
 
-    await expect(clickAs(bot, group, member, reply, 999_004))
-      .rejects.toThrow("storage write failed");
+    await expect(clickAs(bot, group, member, reply, 999_004)).rejects.toThrow(
+      "storage write failed",
+    );
 
-    expect(storage.read(`gd:focus:${group.id}:root:${member.id}`)).toBeUndefined();
-    const instance = [...storage.readAllValues()].find(record => record.type === "instance");
-    expect(instance?.type === "instance" ? instance.value.focusedUserIds : undefined)
-      .not.toContain(member.id);
-    expect(instance?.type === "instance" ? instance.value.stack.at(-1)?.windowId : undefined)
-      .toBe("shared.main");
+    expect(
+      storage.read(`gd:focus:${group.id}:root:${member.id}`),
+    ).toBeUndefined();
+    const instance = [...storage.readAllValues()].find(
+      (record) => record.type === "instance",
+    );
+    expect(
+      instance?.type === "instance" ? instance.value.focusedUserIds : undefined,
+    ).not.toContain(member.id);
+    expect(
+      instance?.type === "instance"
+        ? instance.value.stack.at(-1)?.windowId
+        : undefined,
+    ).toBe("shared.main");
   });
 });

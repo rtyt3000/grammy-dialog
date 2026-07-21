@@ -18,7 +18,9 @@ function byteLength(value: string): number {
 }
 
 /** Creates the built-in callback codec and enforces Telegram's 64-byte limit. */
-export function createCallbackCodec(options: CallbackCodecOptions = {}): CallbackCodec {
+export function createCallbackCodec(
+  options: CallbackCodecOptions = {},
+): CallbackCodec {
   const prefix = options.prefix ?? "gd:";
   const mode = options.mode ?? "opaque";
 
@@ -26,9 +28,10 @@ export function createCallbackCodec(options: CallbackCodecOptions = {}): Callbac
     prefix,
 
     encode(debugHint) {
-      const token = mode === "debug"
-        ? `${debugHint ?? "callback"}.${crypto.randomUUID().slice(0, 8)}`
-        : crypto.randomUUID().replaceAll("-", "");
+      const token =
+        mode === "debug"
+          ? `${debugHint ?? "callback"}.${crypto.randomUUID().slice(0, 8)}`
+          : crypto.randomUUID().replaceAll("-", "");
       const result = `${prefix}${token}`;
 
       if (byteLength(result) > 64) {

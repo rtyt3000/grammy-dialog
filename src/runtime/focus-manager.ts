@@ -35,7 +35,8 @@ export class FocusManager {
       userId,
       instance.threadId,
     );
-    if (!instance.focusedUserIds.includes(userId)) instance.focusedUserIds.push(userId);
+    if (!instance.focusedUserIds.includes(userId))
+      instance.focusedUserIds.push(userId);
     let changed = false;
 
     try {
@@ -43,7 +44,7 @@ export class FocusManager {
         await this.repository.writeFocusIds(
           instance.chatId,
           userId,
-          [...previous.filter(id => id !== instance.id), instance.id],
+          [...previous.filter((id) => id !== instance.id), instance.id],
           instance.threadId,
         );
         changed = true;

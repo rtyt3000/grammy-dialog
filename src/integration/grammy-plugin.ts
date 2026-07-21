@@ -17,10 +17,9 @@ export type DialogPlugin<
  * Creates grammY middleware that installs `ctx.dialog` and `ctx.ui`, then routes
  * callbacks and focused inputs before delegating unmatched updates downstream.
  */
-export function dialogs<
-  C extends Context = Context,
-  Services = unknown,
->(options: DialogRuntimeOptions<C, Services>): DialogPlugin<C, Services> {
+export function dialogs<C extends Context = Context, Services = unknown>(
+  options: DialogRuntimeOptions<C, Services>,
+): DialogPlugin<C, Services> {
   const runtime = new DialogRuntime(options);
   const middleware: MiddlewareFn<C> = async (ctx, next) => {
     const flavored = ctx as C & DialogFlavor;

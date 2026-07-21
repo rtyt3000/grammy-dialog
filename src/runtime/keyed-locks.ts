@@ -6,7 +6,7 @@ export class KeyedLocks {
   public async run<T>(key: string, operation: () => Promise<T>): Promise<T> {
     const previous = this.locks.get(key) ?? Promise.resolve();
     let release!: () => void;
-    const current = new Promise<void>(resolve => {
+    const current = new Promise<void>((resolve) => {
       release = resolve;
     });
     this.locks.set(key, current);

@@ -15,7 +15,9 @@ export class DialogRepository {
   /** Reads an instance snapshot. */
   public async readInstance(id: string): Promise<InstanceRecord | undefined> {
     const record = await this.storage.read(storageKeys.instance(id));
-    return record?.type === "instance" ? structuredClone(record.value) : undefined;
+    return record?.type === "instance"
+      ? structuredClone(record.value)
+      : undefined;
   }
 
   /** Persists a structural snapshot of an instance. */
@@ -28,13 +30,20 @@ export class DialogRepository {
   }
 
   /** Reads a callback binding by its decoded token. */
-  public async readCallback(token: string): Promise<CallbackRecord | undefined> {
+  public async readCallback(
+    token: string,
+  ): Promise<CallbackRecord | undefined> {
     const record = await this.storage.read(storageKeys.callback(token));
-    return record?.type === "callback" ? structuredClone(record.value) : undefined;
+    return record?.type === "callback"
+      ? structuredClone(record.value)
+      : undefined;
   }
 
   /** Persists a structural snapshot of a callback binding. */
-  public async writeCallback(token: string, callback: CallbackRecord): Promise<void> {
+  public async writeCallback(
+    token: string,
+    callback: CallbackRecord,
+  ): Promise<void> {
     await this.storage.write(storageKeys.callback(token), {
       type: "callback",
       version: 1,
@@ -49,7 +58,7 @@ export class DialogRepository {
 
   /** Deletes callback bindings sequentially. */
   public async deleteCallbacks(tokens: ReadonlyArray<string>): Promise<void> {
-    await Promise.all(tokens.map(token => this.deleteCallback(token)));
+    await Promise.all(tokens.map((token) => this.deleteCallback(token)));
   }
 
   /** Reads the instance currently occupying a definition key within a scope. */
@@ -58,7 +67,9 @@ export class DialogRepository {
     definitionId: string,
     key: string,
   ): Promise<string | undefined> {
-    const record = await this.storage.read(storageKeys.identity(scopeKey, definitionId, key));
+    const record = await this.storage.read(
+      storageKeys.identity(scopeKey, definitionId, key),
+    );
     return record?.type === "identity" ? record.value.instanceId : undefined;
   }
 
@@ -69,11 +80,14 @@ export class DialogRepository {
     key: string,
     instanceId: string,
   ): Promise<void> {
-    await this.storage.write(storageKeys.identity(scopeKey, definitionId, key), {
-      type: "identity",
-      version: 1,
-      value: { instanceId },
-    });
+    await this.storage.write(
+      storageKeys.identity(scopeKey, definitionId, key),
+      {
+        type: "identity",
+        version: 1,
+        value: { instanceId },
+      },
+    );
   }
 
   /** Releases a definition key only when it is still owned by the expected instance. */
@@ -105,7 +119,9 @@ export class DialogRepository {
     userId: number,
     threadId?: number,
   ): Promise<string[]> {
-    const record = await this.storage.read(storageKeys.focus(chatId, userId, threadId));
+    const record = await this.storage.read(
+      storageKeys.focus(chatId, userId, threadId),
+    );
     if (record?.type !== "focus") return [];
     return record.version === 1
       ? [record.value.instanceId]
@@ -123,7 +139,7 @@ export class DialogRepository {
     await this.writeFocusIds(
       chatId,
       userId,
-      [...current.filter(id => id !== instanceId), instanceId],
+      [...current.filter((id) => id !== instanceId), instanceId],
       threadId,
     );
   }
@@ -159,7 +175,7 @@ export class DialogRepository {
     await this.writeFocusIds(
       chatId,
       userId,
-      instanceIds.filter(id => id !== instanceId),
+      instanceIds.filter((id) => id !== instanceId),
       threadId,
     );
   }

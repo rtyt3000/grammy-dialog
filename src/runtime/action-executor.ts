@@ -1,8 +1,5 @@
 import type { Context } from "grammy";
-import {
-  type ButtonAction,
-  StateHandle,
-} from "../core.js";
+import { type ButtonAction, StateHandle } from "../core.js";
 import type { InstanceRecord } from "../persistence/storage.js";
 import type { AnyWindow, DefinitionRegistry } from "./definition-registry.js";
 import type { InstanceTransitions } from "./instance-transitions.js";
@@ -25,7 +22,14 @@ export class ActionExecutor<C extends Context, Services> {
     action: ButtonAction,
   ): Promise<void> {
     if (action.kind === "intent") {
-      await this.intent(ctx, instance, selectedWindow, action.name, action.payload, undefined);
+      await this.intent(
+        ctx,
+        instance,
+        selectedWindow,
+        action.name,
+        action.payload,
+        undefined,
+      );
       return;
     }
     if (action.kind === "widget") {
@@ -34,11 +38,21 @@ export class ActionExecutor<C extends Context, Services> {
     }
     const navigation = this.transitions.controller(instance);
     switch (action.kind) {
-      case "go": navigation.go(action.windowId, action.data); break;
-      case "replace": navigation.replace(action.windowId, action.data); break;
-      case "back": navigation.back(); break;
-      case "reset": navigation.reset(action.windowId, action.data); break;
-      case "close": navigation.close(action.result); break;
+      case "go":
+        navigation.go(action.windowId, action.data);
+        break;
+      case "replace":
+        navigation.replace(action.windowId, action.data);
+        break;
+      case "back":
+        navigation.back();
+        break;
+      case "reset":
+        navigation.reset(action.windowId, action.data);
+        break;
+      case "close":
+        navigation.close(action.result);
+        break;
     }
   }
 
@@ -54,9 +68,11 @@ export class ActionExecutor<C extends Context, Services> {
     const viewModel = this.registry.viewModel(instance, selectedWindow);
     const handler = viewModel.intents[name];
     if (handler === undefined) {
-      throw new Error(`Unknown intent '${name}' in window '${selectedWindow.id}'`);
+      throw new Error(
+        `Unknown intent '${name}' in window '${selectedWindow.id}'`,
+      );
     }
-    const state = new StateHandle(instance.state, next => {
+    const state = new StateHandle(instance.state, (next) => {
       instance.state = next;
     });
     const vm = await viewModel.load({
@@ -82,20 +98,31 @@ export class ActionExecutor<C extends Context, Services> {
     selectedWindow: AnyWindow<C>,
     action: Extract<ButtonAction, { kind: "widget" }>,
   ): Promise<void> {
-    if (selectedWindow.keyboard === undefined) {
-      throw new Error(`Widget '${action.widgetId}' is not present in window '${selectedWindow.id}'`);
-    }
-    const renderContext = await this.renderer.createContext(instance, selectedWindow, ctx);
-    const node = typeof selectedWindow.keyboard === "function"
-      ? await selectedWindow.keyboard(renderContext)
-      : selectedWindow.keyboard;
-    const widget = this.renderer.findKeyboardWidget(node, action.widgetId);
+    const renderContext = await this.renderer.createContext(
+      instance,
+      selectedWindow,
+      ctx,
+    );
+    const node = await this.renderer.resolveKeyboard(
+      selectedWindow,
+      renderContext,
+    );
+    const widget = await this.renderer.findKeyboardWidget(
+      instance,
+      node,
+      renderContext,
+      action.widgetId,
+    );
     if (widget === undefined) {
-      throw new Error(`Widget '${action.widgetId}' is not present in window '${selectedWindow.id}'`);
+      throw new Error(
+        `Widget '${action.widgetId}' is not present in window '${selectedWindow.id}'`,
+      );
     }
     const handler = widget.definition.actions[action.action];
     if (handler === undefined) {
-      throw new Error(`Unknown action '${action.action}' in widget '${action.widgetId}'`);
+      throw new Error(
+        `Unknown action '${action.action}' in widget '${action.widgetId}'`,
+      );
     }
     await handler({
       ctx,

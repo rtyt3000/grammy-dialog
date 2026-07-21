@@ -15,4 +15,6 @@ export * from "./kit/dialog-kit.js";
 export * from "./kit/extension.js";
 export * from "./kit/contracts.js";
 export * from "./kit/definition-dsl.js";
-export * from "./kit/built-in-widgets.js";
+export * from "./jsx/elements.js";
+export * from "./jsx/render.js";
+export * from "./jsx/types.js";

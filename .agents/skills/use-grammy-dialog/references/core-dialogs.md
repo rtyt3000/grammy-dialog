@@ -74,22 +74,45 @@ Use `initialState: () => value` when each instance needs freshly created nested 
 
 A dialog owns exactly one ViewModel. Every local window shares its State, View, Context, and Services types.
 
-```ts
+```tsx
 export const profileDialog = dialogDsl.dialog("profile", {
   viewModel: profileViewModel,
 
-  windows: ({ window, ui }) => {
+  windows: ({ window }) => {
     const main = window("main", {
-      text: ({ vm }) => `Profile: ${vm.name}`,
-      keyboard: [[ui.button.go("Edit", "edit")]],
+      view: ({ vm }) => (
+        <Window>
+          <Text>Profile: {vm.name}</Text>
+          <Keyboard>
+            <Row>
+              <Button action={go("edit")}>Edit</Button>
+            </Row>
+          </Keyboard>
+        </Window>
+      ),
     });
 
     const edit = window("edit", {
-      text: "Send a new name",
-      keyboard: [[ui.button.back("Back")]],
-      input: [
-        ui.input.text("name", profileViewModel.actions.saveName, { trim: true }),
-      ],
+      view: (
+        <Window>
+          <Text>Send a new name</Text>
+          <Keyboard>
+            <Row>
+              <Button action={back()}>Back</Button>
+            </Row>
+          </Keyboard>
+          <Input>
+            <TextInput
+              id="name"
+              receive={profileViewModel.actions.saveName}
+              trim
+              validate={value => value.length >= 2
+                ? valid(value)
+                : invalid("Name is too short")}
+            />
+          </Input>
+        </Window>
+      ),
     });
 
     return { main, edit };
@@ -98,24 +121,15 @@ export const profileDialog = dialogDsl.dialog("profile", {
 });
 ```
 
-Local runtime window IDs are prefixed with the dialog ID. Navigation buttons use the local keys returned by `windows`:
-
-- `ui.button.go(text, target)` pushes a frame.
-- `ui.button.replace(text, target)` replaces the top frame.
-- `ui.button.back(text)` pops a frame and closes at the root.
-- `ui.button.reset(text, target)` resets the stack.
-- `ui.button.close(text)` closes the instance.
-- `ui.button.intent(text, viewModel.actions.name, { payload })` runs an intent.
-- `ui.button.url(text, url)` opens a URL.
+Local runtime window IDs are prefixed with the dialog ID. JSX navigation buttons use actions such as `go(target)`, `replace(target)`, `back()`, `reset(target)`, `close()`, and `intent(viewModel.actions.name, payload)`. URL buttons use `<UrlButton url="...">`.
 
 ## Define standalone windows
 
 Use a static standalone window for a dialogless notification or one-screen UI:
 
-```ts
+```tsx
 export const helpWindow = dialogDsl.window("help", {
-  text: "<b>Help</b>",
-  parseMode: "HTML",
+  view: <Window><Text><B>Help</B></Text></Window>,
 });
 ```
 
@@ -145,26 +159,23 @@ Use the catalog key (`profile`, `help`) for compile-time lookup; resource IDs (`
 
 ## Use built-in UI
 
-Use categorized built-ins from the window callback or the kit:
+Use JSX categories for media, text, keyboard, and inputs:
 
-- Text: `ui.text.key(key, params)`.
-- Buttons: `raw`, `intent`, `go`, `replace`, `back`, `reset`, `close`, `url`.
 - Inputs: `text`, `photo`, `video`, `animation`, `audio`, `document`, `voice`, `sticker`, `contact`, `location`, `message`.
-- Media: `photo`, `video`, `animation`, `audio`, `document`, `voice`.
-- Keyboard composition: `ui.keyboard.compose(...)`.
 
 Always bind public inputs to a compatible typed intent reference. For example, a photo input requires an intent whose `Value` is `PhotoInputValue`; TypeScript should reject a string-valued intent.
 
-Window `text`, `media`, and keyboard sources may be static or derived from render context. Keep render functions free of persisted mutation and irreversible side effects because rerenders may repeat them.
+Validate text with the `TextInput` `validate` prop. Return `valid(value)` to accept and optionally normalize the value passed to the intent, or `invalid(message)` to consume the message, skip the intent, and reply with an error. Validation runs after `trim`; both validators and error `TextSource` values may be asynchronous or localized.
+
+Window `view` may be static JSX or derived from render context. Keep render functions free of persisted mutation and irreversible side effects because rerenders may repeat them.
 
 ## Add i18n
 
-Return deferred translations from `ui.text.key(...)`, or call the render context's asynchronous `t(...)` when composing strings:
+Call the render context's asynchronous `t(...)` when composing localized JSX:
 
-```ts
+```tsx
 const localized = dialogDsl.window("localized", {
-  text: async ({ t }) => `<b>${await t("notice.title")}</b>`,
-  parseMode: "HTML",
+  view: async ({ t }) => <Window><Text><B>{await t("notice.title")}</B></Text></Window>,
 });
 
 bot.use(appDialogs.middleware({

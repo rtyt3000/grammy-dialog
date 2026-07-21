@@ -1,7 +1,12 @@
 import type { Context } from "grammy";
-import type { ButtonAction, NavigationController, WidgetAction } from "./actions.js";
+import type {
+  ButtonAction,
+  NavigationController,
+  WidgetAction,
+} from "./actions.js";
 import type { Awaitable, StateHandle } from "./common.js";
 import type { RenderContext, TextSource } from "./rendering.js";
+import type { JsxNode } from "../jsx/types.js";
 
 /** Callback button that invokes an intent, navigation, or widget action. */
 export interface ButtonDefinition<
@@ -23,7 +28,9 @@ export interface UrlButtonDefinition<
 > {
   readonly kind: "url";
   readonly text: TextSource<C, View, Services>;
-  readonly url: string | ((context: RenderContext<C, View, Services>) => Awaitable<string>);
+  readonly url:
+    | string
+    | ((context: RenderContext<C, View, Services>) => Awaitable<string>);
 }
 
 /** Any button accepted in an inline keyboard row. */
@@ -31,20 +38,34 @@ export type KeyboardButtonDefinition<
   C extends Context = Context,
   View = unknown,
   Services = unknown,
-> = ButtonDefinition<C, View, Services> | UrlButtonDefinition<C, View, Services>;
+> =
+  | ButtonDefinition<C, View, Services>
+  | UrlButtonDefinition<C, View, Services>;
 
 /** Creates a callback button; its stable id is inferred from its row position. */
-export function button<C extends Context = Context, View = unknown, Services = unknown>(
+export function button<
+  C extends Context = Context,
+  View = unknown,
+  Services = unknown,
+>(
   text: TextSource<C, View, Services>,
   action: string | ButtonAction,
 ): ButtonDefinition<C, View, Services>;
 /** Creates a callback button with an explicit stable id. */
-export function button<C extends Context = Context, View = unknown, Services = unknown>(
+export function button<
+  C extends Context = Context,
+  View = unknown,
+  Services = unknown,
+>(
   id: string,
   text: TextSource<C, View, Services>,
   action: string | ButtonAction,
 ): ButtonDefinition<C, View, Services>;
-export function button<C extends Context = Context, View = unknown, Services = unknown>(
+export function button<
+  C extends Context = Context,
+  View = unknown,
+  Services = unknown,
+>(
   first: string | TextSource<C, View, Services>,
   second: string | ButtonAction | TextSource<C, View, Services>,
   third?: string | ButtonAction,
@@ -55,12 +76,17 @@ export function button<C extends Context = Context, View = unknown, Services = u
     kind: "callback",
     id: hasExplicitId ? String(first) : undefined,
     text: (hasExplicitId ? second : first) as TextSource<C, View, Services>,
-    action: typeof action === "string" ? { kind: "intent", name: action } : action,
+    action:
+      typeof action === "string" ? { kind: "intent", name: action } : action,
   };
 }
 
 /** Creates an inline URL button. */
-export function urlButton<C extends Context = Context, View = unknown, Services = unknown>(
+export function urlButton<
+  C extends Context = Context,
+  View = unknown,
+  Services = unknown,
+>(
   text: TextSource<C, View, Services>,
   url: UrlButtonDefinition<C, View, Services>["url"],
 ): UrlButtonDefinition<C, View, Services> {
@@ -97,23 +123,26 @@ export type WidgetActionHandler<
   State = unknown,
   Services = unknown,
   Payload = undefined,
-> = (context: WidgetActionContext<C, Props, State, Services, Payload>) => Awaitable<void>;
+> = (
+  context: WidgetActionContext<C, Props, State, Services, Payload>,
+) => Awaitable<void>;
 
-type WidgetPayload<Handler> = Handler extends WidgetActionHandler<
-  any,
-  any,
-  any,
-  any,
-  infer Payload
-> ? Payload : never;
+type WidgetPayload<Handler> =
+  Handler extends WidgetActionHandler<any, any, any, any, infer Payload>
+    ? Payload
+    : never;
 
 type WidgetActionCreator<Payload> = [Payload] extends [undefined]
   ? () => WidgetAction
   : (payload: Payload) => WidgetAction;
 
 /** Type-safe action creators exposed to a keyboard widget renderer. */
-export type WidgetActions<Actions extends Record<string, WidgetActionHandler<any, any, any, any>>> = {
-  readonly [Key in keyof Actions]: WidgetActionCreator<WidgetPayload<Actions[Key]>>;
+export type WidgetActions<
+  Actions extends Record<string, WidgetActionHandler<any, any, any, any>>,
+> = {
+  readonly [Key in keyof Actions]: WidgetActionCreator<
+    WidgetPayload<Actions[Key]>
+  >;
 };
 
 /** Render context extended with the current keyboard widget state and actions. */
@@ -123,7 +152,10 @@ export interface KeyboardWidgetRenderContext<
   Services,
   Props,
   State,
-  Actions extends Record<string, WidgetActionHandler<C, Props, State, Services, any>>,
+  Actions extends Record<
+    string,
+    WidgetActionHandler<C, Props, State, Services, any>
+  >,
 > extends RenderContext<C, View, Services> {
   readonly props: Props;
   readonly state: StateHandle<State>;
@@ -137,20 +169,31 @@ export interface KeyboardWidgetDefinition<
   Services = unknown,
   Props = unknown,
   State = unknown,
-  Actions extends Record<string, WidgetActionHandler<C, Props, State, Services, any>> = Record<
+  Actions extends Record<
     string,
     WidgetActionHandler<C, Props, State, Services, any>
-  >,
+  > = Record<string, WidgetActionHandler<C, Props, State, Services, any>>,
 > {
   readonly state: {
     readonly version: number;
     readonly initial: (props: Props) => State;
-    readonly migrate?: (value: unknown, fromVersion: number, props: Props) => State;
+    readonly migrate?: (
+      value: unknown,
+      fromVersion: number,
+      props: Props,
+    ) => State;
   };
   readonly actions: Actions;
   readonly render: (
-    context: KeyboardWidgetRenderContext<C, View, Services, Props, State, Actions>,
-  ) => Awaitable<KeyboardDefinition<C, View, Services>>;
+    context: KeyboardWidgetRenderContext<
+      C,
+      View,
+      Services,
+      Props,
+      State,
+      Actions
+    >,
+  ) => Awaitable<JsxNode>;
 }
 
 /** User-facing keyboard widget options; state schema version defaults to `1`. */
@@ -160,10 +203,10 @@ export type KeyboardWidgetOptions<
   Services = unknown,
   Props = unknown,
   State = unknown,
-  Actions extends Record<string, WidgetActionHandler<C, Props, State, Services, any>> = Record<
+  Actions extends Record<
     string,
     WidgetActionHandler<C, Props, State, Services, any>
-  >,
+  > = Record<string, WidgetActionHandler<C, Props, State, Services, any>>,
 > = Omit<
   KeyboardWidgetDefinition<C, View, Services, Props, State, Actions>,
   "state"
@@ -171,7 +214,11 @@ export type KeyboardWidgetOptions<
   readonly state: {
     readonly version?: number;
     readonly initial: (props: Props) => State;
-    readonly migrate?: (value: unknown, fromVersion: number, props: Props) => State;
+    readonly migrate?: (
+      value: unknown,
+      fromVersion: number,
+      props: Props,
+    ) => State;
   };
 };
 
@@ -186,7 +233,14 @@ export interface KeyboardWidgetInstance<
   readonly kind: "keyboard-widget";
   readonly id: string;
   readonly props: Props;
-  readonly definition: KeyboardWidgetDefinition<C, View, Services, Props, State, any>;
+  readonly definition: KeyboardWidgetDefinition<
+    C,
+    View,
+    Services,
+    Props,
+    State,
+    any
+  >;
 }
 
 /** A composition of raw rows and independently stateful keyboard widgets. */
@@ -200,19 +254,33 @@ export interface KeyboardGroup<
 }
 
 /** A raw inline keyboard, a mounted stateful widget, or their composition. */
-export type KeyboardNode<C extends Context = Context, View = unknown, Services = unknown> =
+export type KeyboardNode<
+  C extends Context = Context,
+  View = unknown,
+  Services = unknown,
+> =
   | KeyboardDefinition<C, View, Services>
   | KeyboardWidgetInstance<C, View, Services, any, any>
   | KeyboardGroup<C, View, Services>;
 
 /** Combines raw rows and stateful widgets into one keyboard tree. */
-export function keyboard<C extends Context = Context, View = unknown, Services = unknown>(
+export function keyboard<
+  C extends Context = Context,
+  View = unknown,
+  Services = unknown,
+>(
   ...children: ReadonlyArray<KeyboardNode<C, View, Services>>
 ): KeyboardGroup<C, View, Services> {
   return { kind: "keyboard-group", children };
 }
 
 /** Static keyboard content or a render-time keyboard resolver. */
-export type KeyboardSource<C extends Context = Context, View = unknown, Services = unknown> =
+export type KeyboardSource<
+  C extends Context = Context,
+  View = unknown,
+  Services = unknown,
+> =
   | KeyboardNode<C, View, Services>
-  | ((context: RenderContext<C, View, Services>) => Awaitable<KeyboardNode<C, View, Services>>);
+  | ((
+      context: RenderContext<C, View, Services>,
+    ) => Awaitable<KeyboardNode<C, View, Services>>);

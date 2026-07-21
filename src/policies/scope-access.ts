@@ -27,7 +27,8 @@ export const scopes: ScopeStrategies = {
       id: "member",
       resolve(ctx) {
         const chatId = requireChat(ctx);
-        if (ctx.from === undefined) throw new Error("Member scope requires an actor");
+        if (ctx.from === undefined)
+          throw new Error("Member scope requires an actor");
         return { key: `${chatId}:${ctx.from.id}`, chatId };
       },
     };
@@ -48,8 +49,10 @@ export const scopes: ScopeStrategies = {
       id: "topic",
       resolve(ctx) {
         const chatId = requireChat(ctx);
-        const threadId = (ctx.msg as { message_thread_id?: number } | undefined)?.message_thread_id;
-        if (threadId === undefined) throw new Error("Topic scope requires a forum topic message");
+        const threadId = (ctx.msg as { message_thread_id?: number } | undefined)
+          ?.message_thread_id;
+        if (threadId === undefined)
+          throw new Error("Topic scope requires a forum topic message");
         return { key: `${chatId}:${threadId}`, chatId, threadId };
       },
     };
@@ -84,7 +87,9 @@ export const access: AccessStrategies = {
     return {
       id: "owner",
       allows(ctx, instance) {
-        return instance.ownerId !== undefined && ctx.from?.id === instance.ownerId;
+        return (
+          instance.ownerId !== undefined && ctx.from?.id === instance.ownerId
+        );
       },
     };
   },
@@ -102,7 +107,8 @@ export const access: AccessStrategies = {
     return {
       id: "chat-administrators",
       async allows(ctx, instance) {
-        if (ctx.chat?.id !== instance.chatId || ctx.from === undefined) return false;
+        if (ctx.chat?.id !== instance.chatId || ctx.from === undefined)
+          return false;
         const member = await ctx.getChatMember(ctx.from.id);
         return member.status === "creator" || member.status === "administrator";
       },

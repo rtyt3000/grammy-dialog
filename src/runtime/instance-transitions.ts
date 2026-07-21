@@ -20,7 +20,7 @@ export class InstanceTransitions {
       replace: (windowId, data) => this.replace(instance, windowId, data),
       back: () => this.back(instance),
       reset: (windowId, data) => this.reset(instance, windowId, data),
-      close: result => this.close(instance, result),
+      close: (result) => this.close(instance, result),
     };
   }
 
@@ -33,7 +33,11 @@ export class InstanceTransitions {
     instance.stack.push({ windowId: this.resolve(instance, windowId), data });
   }
 
-  private replace(instance: InstanceRecord, windowId: string, data?: unknown): void {
+  private replace(
+    instance: InstanceRecord,
+    windowId: string,
+    data?: unknown,
+  ): void {
     instance.stack[instance.stack.length - 1] = {
       windowId: this.resolve(instance, windowId),
       data,
@@ -45,7 +49,11 @@ export class InstanceTransitions {
     else this.close(instance);
   }
 
-  private reset(instance: InstanceRecord, windowId: string, data?: unknown): void {
+  private reset(
+    instance: InstanceRecord,
+    windowId: string,
+    data?: unknown,
+  ): void {
     instance.stack = [{ windowId: this.resolve(instance, windowId), data }];
   }
 

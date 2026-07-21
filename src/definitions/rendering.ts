@@ -31,4 +31,6 @@ export type TextSource<
 > =
   | string
   | Translation
-  | ((context: RenderContext<C, View, Services>) => Awaitable<string | Translation>);
+  | ((
+      context: RenderContext<C, View, Services>,
+    ) => Awaitable<string | Translation>);

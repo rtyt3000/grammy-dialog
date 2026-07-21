@@ -5,11 +5,19 @@ import type { TextSource } from "./rendering.js";
 import type { IntentReference } from "./view-model.js";
 
 /** Successful input validation with the normalized value passed to the intent. */
-export interface InputValidationSuccess<Value> { readonly ok: true; readonly value: Value; }
+export interface InputValidationSuccess<Value> {
+  readonly ok: true;
+  readonly value: Value;
+}
 /** Failed input validation with an optional user-facing error message. */
-export interface InputValidationFailure { readonly ok: false; readonly message?: TextSource; }
+export interface InputValidationFailure {
+  readonly ok: false;
+  readonly message?: TextSource;
+}
 /** Result returned by an input validator. */
-export type InputValidation<Value> = InputValidationSuccess<Value> | InputValidationFailure;
+export type InputValidation<Value> =
+  | InputValidationSuccess<Value>
+  | InputValidationFailure;
 
 /** Marks an input value as valid and optionally replaces it with a normalized value. */
 export function valid<Value>(value: Value): InputValidationSuccess<Value> {
@@ -95,13 +103,23 @@ export interface FileInputValue {
 }
 
 /** Normalized Telegram video metadata. */
-export interface VideoInputValue extends FileInputValue { width: number; height: number; duration: number; }
+export interface VideoInputValue extends FileInputValue {
+  width: number;
+  height: number;
+  duration: number;
+}
 /** Normalized Telegram animation metadata. */
 export interface AnimationInputValue extends VideoInputValue {}
 /** Normalized Telegram audio metadata. */
-export interface AudioInputValue extends FileInputValue { duration: number; performer?: string; title?: string; }
+export interface AudioInputValue extends FileInputValue {
+  duration: number;
+  performer?: string;
+  title?: string;
+}
 /** Normalized Telegram voice metadata. */
-export interface VoiceInputValue extends FileInputValue { duration: number; }
+export interface VoiceInputValue extends FileInputValue {
+  duration: number;
+}
 /** Normalized Telegram sticker metadata. */
 export interface StickerInputValue extends FileInputValue {
   width: number;
@@ -135,11 +153,20 @@ export interface LocationInputValue {
 export type MessageInputValue = Message;
 /** Built-in non-text input kinds. */
 export type AttachmentInputKind =
-  | "video" | "animation" | "audio" | "document" | "voice"
-  | "sticker" | "contact" | "location" | "message";
+  | "video"
+  | "animation"
+  | "audio"
+  | "document"
+  | "voice"
+  | "sticker"
+  | "contact"
+  | "location"
+  | "message";
 
 /** Definition of a built-in attachment or structured-message input. */
-export interface AttachmentInputDefinition<Kind extends AttachmentInputKind = AttachmentInputKind> {
+export interface AttachmentInputDefinition<
+  Kind extends AttachmentInputKind = AttachmentInputKind,
+> {
   readonly kind: Kind;
   readonly id: string;
   readonly onReceive: string;
@@ -154,26 +181,74 @@ function attachmentInput<Kind extends AttachmentInputKind, Value>(
 }
 
 /** Creates a video input whose receive intent defaults to its id. */
-export function videoInput(id: string, options: InputBindingOptions<VideoInputValue> = {}): AttachmentInputDefinition<"video"> { return attachmentInput("video", id, options); }
+export function videoInput(
+  id: string,
+  options: InputBindingOptions<VideoInputValue> = {},
+): AttachmentInputDefinition<"video"> {
+  return attachmentInput("video", id, options);
+}
 /** Creates an animation input whose receive intent defaults to its id. */
-export function animationInput(id: string, options: InputBindingOptions<AnimationInputValue> = {}): AttachmentInputDefinition<"animation"> { return attachmentInput("animation", id, options); }
+export function animationInput(
+  id: string,
+  options: InputBindingOptions<AnimationInputValue> = {},
+): AttachmentInputDefinition<"animation"> {
+  return attachmentInput("animation", id, options);
+}
 /** Creates an audio input whose receive intent defaults to its id. */
-export function audioInput(id: string, options: InputBindingOptions<AudioInputValue> = {}): AttachmentInputDefinition<"audio"> { return attachmentInput("audio", id, options); }
+export function audioInput(
+  id: string,
+  options: InputBindingOptions<AudioInputValue> = {},
+): AttachmentInputDefinition<"audio"> {
+  return attachmentInput("audio", id, options);
+}
 /** Creates a document input whose receive intent defaults to its id. */
-export function documentInput(id: string, options: InputBindingOptions<FileInputValue> = {}): AttachmentInputDefinition<"document"> { return attachmentInput("document", id, options); }
+export function documentInput(
+  id: string,
+  options: InputBindingOptions<FileInputValue> = {},
+): AttachmentInputDefinition<"document"> {
+  return attachmentInput("document", id, options);
+}
 /** Creates a voice input whose receive intent defaults to its id. */
-export function voiceInput(id: string, options: InputBindingOptions<VoiceInputValue> = {}): AttachmentInputDefinition<"voice"> { return attachmentInput("voice", id, options); }
+export function voiceInput(
+  id: string,
+  options: InputBindingOptions<VoiceInputValue> = {},
+): AttachmentInputDefinition<"voice"> {
+  return attachmentInput("voice", id, options);
+}
 /** Creates a sticker input whose receive intent defaults to its id. */
-export function stickerInput(id: string, options: InputBindingOptions<StickerInputValue> = {}): AttachmentInputDefinition<"sticker"> { return attachmentInput("sticker", id, options); }
+export function stickerInput(
+  id: string,
+  options: InputBindingOptions<StickerInputValue> = {},
+): AttachmentInputDefinition<"sticker"> {
+  return attachmentInput("sticker", id, options);
+}
 /** Creates a contact input whose receive intent defaults to its id. */
-export function contactInput(id: string, options: InputBindingOptions<ContactInputValue> = {}): AttachmentInputDefinition<"contact"> { return attachmentInput("contact", id, options); }
+export function contactInput(
+  id: string,
+  options: InputBindingOptions<ContactInputValue> = {},
+): AttachmentInputDefinition<"contact"> {
+  return attachmentInput("contact", id, options);
+}
 /** Creates a location input whose receive intent defaults to its id. */
-export function locationInput(id: string, options: InputBindingOptions<LocationInputValue> = {}): AttachmentInputDefinition<"location"> { return attachmentInput("location", id, options); }
+export function locationInput(
+  id: string,
+  options: InputBindingOptions<LocationInputValue> = {},
+): AttachmentInputDefinition<"location"> {
+  return attachmentInput("location", id, options);
+}
 /** Creates a raw message input whose receive intent defaults to its id. */
-export function messageInput(id: string, options: InputBindingOptions<MessageInputValue> = {}): AttachmentInputDefinition<"message"> { return attachmentInput("message", id, options); }
+export function messageInput(
+  id: string,
+  options: InputBindingOptions<MessageInputValue> = {},
+): AttachmentInputDefinition<"message"> {
+  return attachmentInput("message", id, options);
+}
 
 /** Definition produced by a user-defined input widget. */
-export interface CustomInputDefinition<C extends Context = Context, Value = unknown> {
+export interface CustomInputDefinition<
+  C extends Context = Context,
+  Value = unknown,
+> {
   readonly kind: "custom";
   readonly id: string;
   readonly onReceive: string;

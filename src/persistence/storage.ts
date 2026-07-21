@@ -115,7 +115,7 @@ export class MemoryStorageAdapter<T> implements CoordinatedStorageAdapter<T> {
   ): Promise<Result> {
     const previous = this.identityLocks.get(identity) ?? Promise.resolve();
     let release!: () => void;
-    const current = new Promise<void>(resolve => {
+    const current = new Promise<void>((resolve) => {
       release = resolve;
     });
     this.identityLocks.set(identity, current);
@@ -124,7 +124,8 @@ export class MemoryStorageAdapter<T> implements CoordinatedStorageAdapter<T> {
       return await operation();
     } finally {
       release();
-      if (this.identityLocks.get(identity) === current) this.identityLocks.delete(identity);
+      if (this.identityLocks.get(identity) === current)
+        this.identityLocks.delete(identity);
     }
   }
 }

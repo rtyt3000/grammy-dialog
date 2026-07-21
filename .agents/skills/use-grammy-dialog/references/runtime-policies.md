@@ -42,13 +42,13 @@ Treat scope and access as independent questions:
 
 For a group poll with shared state:
 
-```ts
+```tsx
 const poll = dialogDsl.dialog("poll", {
   viewModel: pollViewModel,
   scope: dialogDsl.scope.chat<AppContext>(),
   access: dialogDsl.access.everyone<AppContext>(),
   windows: ({ window }) => ({
-    main: window("main", { text: "Poll" }),
+    main: window("main", { view: <Text>Poll</Text> }),
   }),
 });
 ```

@@ -36,7 +36,9 @@ export type IntentHandler<
   Services = unknown,
   Payload = unknown,
   Value = unknown,
-> = (context: IntentContext<C, State, View, Services, Payload, Value>) => Awaitable<void>;
+> = (
+  context: IntentContext<C, State, View, Services, Payload, Value>,
+) => Awaitable<void>;
 
 /** Definition-time reference serialized as an intent name in callbacks and inputs. */
 export interface IntentReference<Payload = unknown, Value = unknown> {
@@ -48,7 +50,9 @@ export interface IntentReference<Payload = unknown, Value = unknown> {
   readonly __value?: Value;
 }
 
-type IntentReferences<Intents extends Record<string, IntentHandler<any, any, any, any>>> = {
+type IntentReferences<
+  Intents extends Record<string, IntentHandler<any, any, any, any>>,
+> = {
   readonly [Name in keyof Intents]: Intents[Name] extends IntentHandler<
     any,
     any,
@@ -56,7 +60,9 @@ type IntentReferences<Intents extends Record<string, IntentHandler<any, any, any
     any,
     infer Payload,
     infer Value
-  > ? IntentReference<Payload, Value> : never;
+  >
+    ? IntentReference<Payload, Value>
+    : never;
 };
 
 /** Runtime-normalized ViewModel definition used by a window. */
@@ -65,13 +71,15 @@ export interface ViewModelDefinition<
   View = unknown,
   C extends Context = Context,
   Services = unknown,
-  Intents extends Record<string, IntentHandler<C, State, View, Services, any, any>> = Record<
+  Intents extends Record<
     string,
     IntentHandler<C, State, View, Services, any, any>
-  >,
+  > = Record<string, IntentHandler<C, State, View, Services, any, any>>,
 > {
   readonly initialState: () => State;
-  readonly load: (context: ViewModelLoadContext<C, State, Services>) => Awaitable<View>;
+  readonly load: (
+    context: ViewModelLoadContext<C, State, Services>,
+  ) => Awaitable<View>;
   readonly intents: Intents;
   /** Stable, typed references used by buttons and input bindings. */
   readonly actions: IntentReferences<Intents>;
@@ -85,25 +93,32 @@ export interface ViewModelFactory<C extends Context, Services> {
   /** Creates an identity ViewModel whose view is its state. */
   <
     State,
-    Intents extends Record<string, IntentHandler<C, State, State, Services, any, any>> = {},
+    Intents extends Record<
+      string,
+      IntentHandler<C, State, State, Services, any, any>
+    > = {},
   >(definition: {
     initialState: State | (() => State);
     load?: undefined;
-    intents?: Intents & Record<string, IntentHandler<C, State, State, Services, any, any>>;
+    intents?: Intents &
+      Record<string, IntentHandler<C, State, State, Services, any, any>>;
   }): ViewModelDefinition<State, State, C, Services, Intents>;
 
   /** Creates a ViewModel with an inferred custom view. */
   <
     State,
     View,
-    Intents extends Record<string, IntentHandler<C, State, View, Services, any, any>> = Record<
+    Intents extends Record<
       string,
       IntentHandler<C, State, View, Services, any, any>
-    >,
+    > = Record<string, IntentHandler<C, State, View, Services, any, any>>,
   >(definition: {
     initialState?: State | (() => State);
-    load: (context: ViewModelLoadContext<C, State, Services>) => Awaitable<View>;
-    intents?: Intents & Record<string, IntentHandler<C, State, View, Services, any, any>>;
+    load: (
+      context: ViewModelLoadContext<C, State, Services>,
+    ) => Awaitable<View>;
+    intents?: Intents &
+      Record<string, IntentHandler<C, State, View, Services, any, any>>;
   }): ViewModelDefinition<State, View, C, Services, Intents>;
 }
 
@@ -112,8 +127,8 @@ export function createViewModelFactory<
   C extends Context = Context,
   Services = unknown,
 >(): ViewModelFactory<C, Services> {
-  return ((definition: Parameters<typeof viewModel>[0]) => viewModel(definition)) as unknown as
-    ViewModelFactory<C, Services>;
+  return ((definition: Parameters<typeof viewModel>[0]) =>
+    viewModel(definition)) as unknown as ViewModelFactory<C, Services>;
 }
 
 /** Creates an empty identity ViewModel for a static or stateless window. */
@@ -123,11 +138,15 @@ export function viewModel<
   State,
   C extends Context = Context,
   Services = unknown,
-  Intents extends Record<string, IntentHandler<C, State, State, Services, any, any>> = {},
+  Intents extends Record<
+    string,
+    IntentHandler<C, State, State, Services, any, any>
+  > = {},
 >(definition: {
   initialState: State | (() => State);
   load?: undefined;
-  intents?: Intents & Record<string, IntentHandler<C, State, State, Services, any, any>>;
+  intents?: Intents &
+    Record<string, IntentHandler<C, State, State, Services, any, any>>;
 }): ViewModelDefinition<State, State, C, Services, Intents>;
 /** Creates a ViewModel with a custom asynchronous or synchronous view loader. */
 export function viewModel<
@@ -135,29 +154,33 @@ export function viewModel<
   View,
   C extends Context = Context,
   Services = unknown,
-  Intents extends Record<string, IntentHandler<C, State, View, Services, any, any>> = Record<
+  Intents extends Record<
     string,
     IntentHandler<C, State, View, Services, any, any>
-  >,
+  > = Record<string, IntentHandler<C, State, View, Services, any, any>>,
 >(definition: {
   initialState?: State | (() => State);
   load: (context: ViewModelLoadContext<C, State, Services>) => Awaitable<View>;
-  intents?: Intents & Record<string, IntentHandler<C, State, View, Services, any, any>>;
+  intents?: Intents &
+    Record<string, IntentHandler<C, State, View, Services, any, any>>;
 }): ViewModelDefinition<State, View, C, Services, Intents>;
-export function viewModel(definition: {
-  initialState?: unknown | (() => unknown);
-  load?: (context: ViewModelLoadContext<any, any, any>) => Awaitable<unknown>;
-  intents?: Record<string, IntentHandler<any, any, any, any>>;
-} = {}): ViewModelDefinition<any, any, any, any, any> {
+export function viewModel(
+  definition: {
+    initialState?: unknown | (() => unknown);
+    load?: (context: ViewModelLoadContext<any, any, any>) => Awaitable<unknown>;
+    intents?: Record<string, IntentHandler<any, any, any, any>>;
+  } = {},
+): ViewModelDefinition<any, any, any, any, any> {
   const initialState = definition.initialState ?? {};
   return {
-    initialState: typeof initialState === "function"
-      ? initialState as () => unknown
-      : () => structuredClone(initialState),
+    initialState:
+      typeof initialState === "function"
+        ? (initialState as () => unknown)
+        : () => structuredClone(initialState),
     load: definition.load ?? (({ state }) => state),
     intents: definition.intents ?? {},
     actions: Object.fromEntries(
-      Object.keys(definition.intents ?? {}).map(name => [
+      Object.keys(definition.intents ?? {}).map((name) => [
         name,
         Object.freeze({ kind: "intent-reference", name }),
       ]),

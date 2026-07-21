@@ -21,12 +21,16 @@ export const profileViewModel = dialogDsl.viewModel({
   initialState: (): ProfileState => ({}),
   async load({ actor, services, state }) {
     return {
-      name: state.name ?? await services.profiles.displayName(actor.id ?? 0),
+      name: state.name ?? (await services.profiles.displayName(actor.id ?? 0)),
       photoFileId: state.photoFileId,
     };
   },
   intents: {
-    saveName({ state, value, navigation }: IntentContext<
+    saveName({
+      state,
+      value,
+      navigation,
+    }: IntentContext<
       AppContext,
       ProfileState,
       ProfileView,
@@ -34,10 +38,14 @@ export const profileViewModel = dialogDsl.viewModel({
       undefined,
       string
     >) {
-      state.update(current => ({ ...current, name: value }));
+      state.update((current) => ({ ...current, name: value }));
       navigation.back();
     },
-    savePhoto({ state, value, navigation }: IntentContext<
+    savePhoto({
+      state,
+      value,
+      navigation,
+    }: IntentContext<
       AppContext,
       ProfileState,
       ProfileView,
@@ -45,7 +53,7 @@ export const profileViewModel = dialogDsl.viewModel({
       undefined,
       PhotoInputValue
     >) {
-      state.update(current => ({ ...current, photoFileId: value.fileId }));
+      state.update((current) => ({ ...current, photoFileId: value.fileId }));
       navigation.back();
     },
   },

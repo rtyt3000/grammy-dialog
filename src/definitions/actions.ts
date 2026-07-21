@@ -3,9 +3,17 @@ import type { IntentReference } from "./view-model.js";
 /** A stack navigation command produced by a button or an intent handler. */
 export type NavigationAction =
   | { readonly kind: "go"; readonly windowId: string; readonly data?: unknown }
-  | { readonly kind: "replace"; readonly windowId: string; readonly data?: unknown }
+  | {
+      readonly kind: "replace";
+      readonly windowId: string;
+      readonly data?: unknown;
+    }
   | { readonly kind: "back" }
-  | { readonly kind: "reset"; readonly windowId: string; readonly data?: unknown }
+  | {
+      readonly kind: "reset";
+      readonly windowId: string;
+      readonly data?: unknown;
+    }
   | { readonly kind: "close"; readonly result?: unknown };
 
 /** Invokes a named intent on the current window's ViewModel. */

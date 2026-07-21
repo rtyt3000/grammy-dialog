@@ -10,14 +10,15 @@ This example keeps the important MVP scenarios in one place:
 
 The plugin configuration also demonstrates automatic presentation fallback,
 detaching keyboards on close, and reply-aware routing between active inputs.
-The counter and report windows omit ViewModel entirely; the report caption uses HTML parse mode.
+The counter and report windows omit ViewModel entirely; TSX text automatically uses Telegram HTML mode.
 
 The example uses the preferred immutable `DialogKit` composition model:
 
-- `counterExtension` demonstrates the third-party `defineDialogExtension` DSL;
-- dialogs use nested local-window builders;
-- each dialog keeps its layout in `index.ts` and state/load/intents in `view-model.ts`;
-- navigation uses categorized primitives such as `ui.button.intent`, `ui.button.go`, and `ui.button.back`;
+- `Counter` demonstrates `defineWidget` and direct reuse as an exported JSX component;
+- dialogs use nested local-window builders while presentation is declared with TSX;
+- each dialog keeps its layout in `index.tsx` and state/load/intents in `view-model.ts`;
+- navigation and intents use serializable `go`, `back`, and `intent` actions in JSX buttons;
+- `Photo` demonstrates media and `Counter` uses the persisted stateful-widget runtime;
 - `dialogDsl.define(...)` collects ordinary application resources once;
 - plugin extensions remain reserved for reusable third-party contributions;
 - `appDialogs.middleware(...)` registers every collected resource without a manual `list`.

@@ -2,18 +2,22 @@ import { describe, expect, test } from "bun:test";
 import { Bot } from "grammy";
 import { prepareBot } from "grammy-testing";
 import {
-  animation,
-  audio,
-  button,
+  Animation,
+  Audio,
+  Button,
   dialogs,
-  document,
+  Document,
   documentInput,
+  Keyboard,
+  intent,
   inputRouting,
-  photo,
-  video,
+  Photo,
+  Row,
+  Text,
+  Video,
   videoInput,
+  Voice,
   viewModel,
-  voice,
   window,
   type DialogStorageRecord,
 } from "../src/internal.js";
@@ -24,16 +28,31 @@ const staticVm = viewModel({ initialState: {}, load: () => ({}), intents: {} });
 describe("expanded media", () => {
   test("sends video, animation, audio, document and voice surfaces", async () => {
     const resources = [
-      window("video", { viewModel: staticVm, media: video("video-file") }),
-      window("animation", { viewModel: staticVm, media: animation("animation-file") }),
-      window("audio", { viewModel: staticVm, media: audio("audio-file") }),
-      window("document", { viewModel: staticVm, media: document("document-file") }),
-      window("voice", { viewModel: staticVm, media: voice("voice-file") }),
+      window("video", {
+        viewModel: staticVm,
+        view: <Video source="video-file" />,
+      }),
+      window("animation", {
+        viewModel: staticVm,
+        view: <Animation source="animation-file" />,
+      }),
+      window("audio", {
+        viewModel: staticVm,
+        view: <Audio source="audio-file" />,
+      }),
+      window("document", {
+        viewModel: staticVm,
+        view: <Document source="document-file" />,
+      }),
+      window("voice", {
+        viewModel: staticVm,
+        view: <Voice source="voice-file" />,
+      }),
     ];
     const bot = new Bot<TestContext>("test-token");
     bot.use(dialogs<TestContext>({ list: resources }));
     for (const resource of resources) {
-      bot.command(resource.id, ctx => ctx.ui.show(resource.id));
+      bot.command(resource.id, (ctx) => ctx.ui.show(resource.id));
     }
     const { chats } = await prepareBot(bot);
     const user = chats.newUser();
@@ -53,18 +72,30 @@ describe("expanded media", () => {
       load: ({ state }) => state,
       intents: {
         switch({ state }) {
-          state.update(current => ({ ...current, video: true }));
+          state.update((current) => ({ ...current, video: true }));
         },
       },
     });
     const mediaCard = window("media-transition", {
       viewModel: vm,
-      media: ({ vm }) => vm.video ? video("video-file") : photo("photo-file"),
-      keyboard: [[button("Switch", "switch")]],
+      view: ({ vm }) => (
+        <>
+          {vm.video ? (
+            <Video source="video-file" />
+          ) : (
+            <Photo source="photo-file" />
+          )}
+          <Keyboard>
+            <Row>
+              <Button action={intent<undefined>("switch")}>Switch</Button>
+            </Row>
+          </Keyboard>
+        </>
+      ),
     });
     const bot = new Bot<TestContext>("test-token");
     bot.use(dialogs<TestContext>({ list: [mediaCard] }));
-    bot.command("media", ctx => ctx.ui.show("media-transition"));
+    bot.command("media", (ctx) => ctx.ui.show("media-transition"));
     const { chats } = await prepareBot(bot);
     const user = chats.newUser();
     await user.sendCommand("media");
@@ -83,7 +114,7 @@ describe("expanded media", () => {
       load: ({ state }) => state,
       intents: {
         receive({ state, value }) {
-          state.update(current => ({
+          state.update((current) => ({
             ...current,
             fileId: String((value as { fileId: string }).fileId),
           }));
@@ -92,23 +123,25 @@ describe("expanded media", () => {
     });
     const videoWindow = window("video-input", {
       viewModel: inputVm,
-      text: ({ vm }) => vm.fileId,
+      view: ({ vm }) => <Text>{vm.fileId}</Text>,
       input: [videoInput("video", { onReceive: "receive" })],
     });
     const documentWindow = window("document-input", {
       viewModel: inputVm,
-      text: ({ vm }) => vm.fileId,
+      view: ({ vm }) => <Text>{vm.fileId}</Text>,
       input: [documentInput("document", { onReceive: "receive" })],
     });
     const storage = new JsonStorageAdapter<DialogStorageRecord>();
     const bot = new Bot<TestContext>("test-token");
-    bot.use(dialogs<TestContext>({
-      list: [videoWindow, documentWindow],
-      storage,
-      defaults: { inputRouting: inputRouting.latest() },
-    }));
-    bot.command("video", ctx => ctx.ui.show("video-input"));
-    bot.command("document", ctx => ctx.ui.show("document-input"));
+    bot.use(
+      dialogs<TestContext>({
+        list: [videoWindow, documentWindow],
+        storage,
+        defaults: { inputRouting: inputRouting.latest() },
+      }),
+    );
+    bot.command("video", (ctx) => ctx.ui.show("video-input"));
+    bot.command("document", (ctx) => ctx.ui.show("document-input"));
     const { chats } = await prepareBot(bot);
     const user = chats.newUser();
 
@@ -118,8 +151,10 @@ describe("expanded media", () => {
     await user.sendDocument("incoming-document");
 
     const states = [...storage.readAllValues()]
-      .filter(record => record.type === "instance")
-      .map(record => record.type === "instance" ? record.value.state : undefined);
+      .filter((record) => record.type === "instance")
+      .map((record) =>
+        record.type === "instance" ? record.value.state : undefined,
+      );
     expect(states).toContainEqual({ fileId: "incoming-video" });
     expect(states).toContainEqual({ fileId: "incoming-document" });
   });

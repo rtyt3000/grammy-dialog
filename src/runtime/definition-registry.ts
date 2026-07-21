@@ -12,7 +12,10 @@ export type AnyWindow<C extends Context> = WindowDefinition<C, any, any, any>;
 
 /** Resolves registered dialogs, standalone windows, and dialog-local aliases. */
 export class DefinitionRegistry<C extends Context = Context> {
-  private readonly dialogs = new Map<string, DialogDefinition<C, any, any, any>>();
+  private readonly dialogs = new Map<
+    string,
+    DialogDefinition<C, any, any, any>
+  >();
   private readonly windows = new Map<string, AnyWindow<C>>();
 
   public constructor(resources: ReadonlyArray<DialogResource<C>>) {
@@ -20,7 +23,9 @@ export class DefinitionRegistry<C extends Context = Context> {
   }
 
   /** Resolves a dialog id or returns the supplied definition. */
-  public dialog(reference: string | DialogDefinition<any, any, any, any>): DialogDefinition<C, any, any, any> {
+  public dialog(
+    reference: string | DialogDefinition<any, any, any, any>,
+  ): DialogDefinition<C, any, any, any> {
     const id = typeof reference === "string" ? reference : reference.id;
     const dialog = this.dialogs.get(id);
     if (dialog === undefined) throw new Error(`Unknown dialog: ${id}`);
@@ -28,12 +33,16 @@ export class DefinitionRegistry<C extends Context = Context> {
   }
 
   /** Finds a dialog without throwing when it is not registered. */
-  public findDialog(id: string): DialogDefinition<C, any, any, any> | undefined {
+  public findDialog(
+    id: string,
+  ): DialogDefinition<C, any, any, any> | undefined {
     return this.dialogs.get(id);
   }
 
   /** Resolves a window id or returns the supplied definition. */
-  public window(reference: string | WindowDefinition<any, any, any, any>): AnyWindow<C> {
+  public window(
+    reference: string | WindowDefinition<any, any, any, any>,
+  ): AnyWindow<C> {
     const id = typeof reference === "string" ? reference : reference.id;
     const selectedWindow = this.windows.get(id);
     if (selectedWindow === undefined) throw new Error(`Unknown window: ${id}`);
@@ -43,7 +52,8 @@ export class DefinitionRegistry<C extends Context = Context> {
   /** Resolves the window at the top of an instance navigation stack. */
   public currentWindow(instance: InstanceRecord): AnyWindow<C> {
     const frame = instance.stack[instance.stack.length - 1];
-    if (frame === undefined) throw new Error(`Instance '${instance.id}' has an empty stack`);
+    if (frame === undefined)
+      throw new Error(`Instance '${instance.id}' has an empty stack`);
     return this.window(frame.windowId);
   }
 
@@ -54,20 +64,28 @@ export class DefinitionRegistry<C extends Context = Context> {
   ): ViewModelDefinition<any, any, C, any> {
     if (instance.kind === "dialog") {
       const dialog = this.dialogs.get(instance.definitionId);
-      if (dialog === undefined) throw new Error(`Unknown dialog: ${instance.definitionId}`);
+      if (dialog === undefined)
+        throw new Error(`Unknown dialog: ${instance.definitionId}`);
       return dialog.viewModel;
     }
     if (selectedWindow.viewModel === undefined) {
-      throw new Error(`Standalone window '${selectedWindow.id}' has no ViewModel`);
+      throw new Error(
+        `Standalone window '${selectedWindow.id}' has no ViewModel`,
+      );
     }
     return selectedWindow.viewModel;
   }
 
   /** Resolves a window reference relative to an instance's dialog definition. */
-  public resolveForInstance(instance: InstanceRecord, reference: string): string {
+  public resolveForInstance(
+    instance: InstanceRecord,
+    reference: string,
+  ): string {
     if (instance.kind !== "dialog") return reference;
     const dialog = this.dialogs.get(instance.definitionId);
-    return dialog === undefined ? reference : this.resolveDialogWindow(dialog, reference);
+    return dialog === undefined
+      ? reference
+      : this.resolveDialogWindow(dialog, reference);
   }
 
   /** Resolves either a dialog-local key or a globally registered window id. */
@@ -85,7 +103,8 @@ export class DefinitionRegistry<C extends Context = Context> {
         continue;
       }
 
-      if (this.dialogs.has(resource.id)) throw new Error(`Duplicate dialog id: ${resource.id}`);
+      if (this.dialogs.has(resource.id))
+        throw new Error(`Duplicate dialog id: ${resource.id}`);
       this.dialogs.set(resource.id, resource);
       for (const selectedWindow of Object.values(resource.windows)) {
         this.registerWindow(selectedWindow);

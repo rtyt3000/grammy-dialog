@@ -70,7 +70,18 @@ pnpm dlx skills add rtyt3000/grammy-dialog \
 ```ts
 import { Bot, type Context } from "grammy";
 import {
+  Button,
+  Input,
+  Keyboard,
+  Row,
+  Text,
+  TextInput,
+  Window,
+  back,
   createDialogKit,
+  go,
+  invalid,
+  valid,
   type DialogFlavor,
 } from "@ppsh/grammy-dialog";
 
@@ -88,7 +99,7 @@ const builder = createDialogKit<BotContext, Services>();
 Один Dialog имеет один ViewModel и одно persisted-состояние. Все его окна получают
 одинаковые `State`, `View`, `Context` и `Services`:
 
-```ts
+```tsx
 interface ProfileState {
   name?: string;
 }
@@ -113,22 +124,49 @@ const profileVm = builder.viewModel({
 const profile = builder.dialog("profile", {
   viewModel: profileVm,
 
-  windows: ({ window, ui }) => ({
+  windows: ({ window }) => ({
     main: window("main", {
-      text: ({ vm }) => `Profile: ${vm.name}`,
-      keyboard: [[ui.button.go("Edit", "edit")]],
+      view: ({ vm }) => (
+        <Window>
+          <Text>Profile: {vm.name}</Text>
+          <Keyboard>
+            <Row>
+              <Button action={go("edit")}>Edit</Button>
+            </Row>
+          </Keyboard>
+        </Window>
+      ),
     }),
 
     edit: window("edit", {
-      text: "Send a new name",
-      keyboard: [[ui.button.back("Back")]],
-      input: [
-        ui.input.text("name", profileVm.actions.saveName, { trim: true }),
-      ],
+      view: (
+        <Window>
+          <Text>Send a new name</Text>
+          <Keyboard>
+            <Row>
+              <Button action={back()}>Back</Button>
+            </Row>
+          </Keyboard>
+          <Input>
+            <TextInput
+              id="name"
+              receive={profileVm.actions.saveName}
+              trim
+              validate={value => value.length >= 2
+                ? valid(value)
+                : invalid("Имя слишком короткое")}
+            />
+          </Input>
+        </Window>
+      ),
     }),
   }),
 });
 ```
+
+`validate` вызывается после `trim`. `valid(value)` принимает ввод и может передать в intent
+нормализованное значение; `invalid(message)` не вызывает intent и отправляет пользователю ошибку.
+Валидатор может быть асинхронным, а сообщение — локализуемым `TextSource`.
 
 `profileVm.actions.saveName` — типизированная definition-time ссылка. В callback и
 storage сохраняется только имя intent, но переименование и несовместимые input values
@@ -136,10 +174,9 @@ storage сохраняется только имя intent, но переимен
 
 Standalone Window не требует ViewModel, если ему не нужно состояние:
 
-```ts
+```tsx
 const help = builder.window("help", {
-  text: "Help",
-  parseMode: "HTML",
+  view: <Window><Text>Help</Text></Window>,
 });
 ```
 
@@ -163,42 +200,99 @@ bot.command("profile", ctx => ctx.dialog.start(app.dialogs.profile));
 bot.command("help", ctx => ctx.ui.show(app.windows.help));
 ```
 
+## TSX View
+
+Окно может описывать presentation через TSX. Это новый основной View API: JSX компилируется
+напрямую в `RenderedWindow` и не использует definition DSL для построения текста или клавиатуры.
+
+Добавьте automatic JSX runtime в `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "@ppsh/grammy-dialog"
+  }
+}
+```
+
+```tsx
+import {
+  B,
+  Button,
+  Input,
+  Keyboard,
+  Row,
+  Text,
+  TextInput,
+  Window,
+  intent,
+} from "@ppsh/grammy-dialog";
+
+const counter = builder.window("counter", {
+  viewModel: counterVm,
+  view: ({ vm }) => (
+    <Window>
+      <Text>Счёт: <B>{vm.count}</B></Text>
+      <Keyboard>
+        <Row>
+          <Button action={intent(counterVm.actions.increment)}>+1</Button>
+        </Row>
+      </Keyboard>
+    </Window>
+  ),
+});
+```
+
+Текстовые значения автоматически экранируются и отправляются с `parse_mode: "HTML"`.
+Поддерживаются `Fragment`, sync/async-компоненты, Telegram HTML-теги, `Text`, `Photo`,
+`Keyboard`, `Row`, `Button`, `UrlButton` и монтирование stateful-виджета через `Widget`.
+`Button` принимает сериализуемый `ButtonAction`; callback
+не хранит closure и продолжает использовать проверки instance revision, scope и access.
+
+Переход на TSX — breaking change: прежние поля Window `text`, `parseMode`, `media` и
+`keyboard` удалены. Перенесите их содержимое соответственно в `<Text>`, media-elements и
+`<Keyboard>` внутри `view`; Telegram HTML используется автоматически. Input bindings можно
+объявлять через `<Input>` в JSX, а низкоуровневое поле `input` сохранено для программных
+bindings. Policies остаются свойствами Window/Dialog.
+
 ## Категории UI
 
 Встроенные элементы не смешиваются с пользовательскими widgets:
 
-```ts
-ui.text.key("profile.title");
+```tsx
+<Text>{await t("profile.title")}</Text>
 
-ui.button.intent("Save", profileVm.actions.saveName);
-ui.button.go("Details", "details");
-ui.button.replace("Summary", "summary");
-ui.button.back("Back");
-ui.button.reset("Home", "main");
-ui.button.close("Close");
-ui.button.url("Docs", "https://example.com");
+<Button action={intent(profileVm.actions.saveName)}>Save</Button>
+<Button action={go("details")}>Details</Button>
+<Button action={replace("summary")}>Summary</Button>
+<Button action={back()}>Back</Button>
+<Button action={reset("main")}>Home</Button>
+<Button action={close()}>Close</Button>
+<UrlButton url="https://example.com">Docs</UrlButton>
 
-ui.input.text("name", profileVm.actions.saveName);
-ui.input.photo("avatar", profileVm.actions.savePhoto);
-ui.input.document("document", uploadVm.actions.receiveDocument);
-
-ui.media.photo("telegram-file-id");
-ui.media.video("telegram-file-id");
+<Photo source="telegram-file-id" />
+<Video source="telegram-file-id" />
 ```
 
-Низкоуровневая callback-кнопка доступна как `ui.button.raw()`.
+```ts
+input: [
+  bind.text("name", profileVm.actions.saveName, { trim: true }),
+  bind.photo("avatar", profileVm.actions.savePhoto),
+];
+```
 
 ## Scope, access и keyed instances
 
 Scope отвечает за принадлежность состояния, access — за право взаимодействия:
 
-```ts
+```tsx
 const poll = builder.dialog("poll", {
   viewModel: pollVm,
   scope: builder.scope.chat(),
   access: builder.access.everyone(),
   windows: ({ window }) => ({
-    main: window("main", { text: "Poll" }),
+    main: window("main", { view: <Text>Poll</Text> }),
   }),
 });
 ```
@@ -263,48 +357,41 @@ focused instance через стратегию:
 
 ## Пользовательские widgets
 
-Extension не создаёт Bot и не имеет runtime side effects:
+Widget definition не создаёт Bot и не имеет runtime side effects:
 
-```ts
-import { defineDialogExtension } from "@ppsh/grammy-dialog";
+```tsx
+import { Button, Row, defineWidget } from "@ppsh/grammy-dialog";
 
-const counterExtension = defineDialogExtension(({ widget, ui }) => {
-  const counter = widget.keyboard({
-    state: {
-      version: 2,
-      initial: (_props: { step?: number }) => 0,
-      migrate: (previous, fromVersion) =>
-        fromVersion === 1 ? Number(previous) : 0,
+const Counter = defineWidget<{ step?: number }, number>()({
+  state: {
+    version: 2,
+    initial: (_props: { step?: number }) => 0,
+    migrate: (previous, fromVersion) =>
+      fromVersion === 1 ? Number(previous) : 0,
+  },
+
+  actions: {
+    increment({ state, props }) {
+      state.update(value => value + (props.step ?? 1));
     },
+  },
 
-    actions: {
-      increment({ state, props }) {
-        state.update(value => value + (props.step ?? 1));
-      },
-    },
-
-    render({ state, actions }) {
-      return [[
-        ui.button.raw(String(state.value), actions.increment()),
-      ]];
-    },
-  });
-
-  return { widgets: { counter } };
+  render: ({ state, actions }) => (
+    <Row>
+      <Button action={actions.increment()}>{state.value}</Button>
+    </Row>
+  ),
 });
-
-const extended = createDialogKit<BotContext, Services>()
-  .use(counterExtension);
 ```
 
-`widgets` содержит только установленные пользовательские компоненты. Несколько
-stateful widgets можно поместить в одну клавиатуру:
+`Counter` — обычный экспортируемый JSX-компонент, а не элемент каталога DialogKit.
+Несколько stateful widgets можно поместить в одну клавиатуру:
 
-```ts
-keyboard: ui.keyboard.compose(
-  widgets.counter("left", { step: 1 }),
-  widgets.counter("right", { step: 10 }),
-);
+```tsx
+<Keyboard>
+  <Counter id="left" step={1} />
+  <Counter id="right" step={10} />
+</Keyboard>
 ```
 
 `id` является namespace persisted-состояния. Дублирование id в одном дереве

@@ -1,7 +1,4 @@
-import type {
-  CloseStrategy,
-  PresentationStrategy,
-} from "./contracts.js";
+import type { CloseStrategy, PresentationStrategy } from "./contracts.js";
 
 /** Factories for built-in and application-defined presentation strategies. */
 export interface PresentationStrategies {
@@ -19,22 +16,30 @@ export interface PresentationStrategies {
 
 function telegramDescription(error: unknown): string {
   if (typeof error !== "object" || error === null) return "";
-  const candidate = error as { description?: unknown; message?: unknown; error_code?: unknown };
-  if (candidate.error_code !== undefined && candidate.error_code !== 400) return "";
-  const description = typeof candidate.description === "string"
-    ? candidate.description
-    : typeof candidate.message === "string"
-      ? candidate.message
-      : "";
+  const candidate = error as {
+    description?: unknown;
+    message?: unknown;
+    error_code?: unknown;
+  };
+  if (candidate.error_code !== undefined && candidate.error_code !== 400)
+    return "";
+  const description =
+    typeof candidate.description === "string"
+      ? candidate.description
+      : typeof candidate.message === "string"
+        ? candidate.message
+        : "";
   return description.toLowerCase();
 }
 
 /** Returns whether a Telegram edit error is safe to recover through replacement. */
 export function isRecoverableEditError(error: unknown): boolean {
   const description = telegramDescription(error);
-  return description.includes("message to edit not found") ||
+  return (
+    description.includes("message to edit not found") ||
     description.includes("message can't be edited") ||
-    description.includes("message can not be edited");
+    description.includes("message can not be edited")
+  );
 }
 
 function canEditInPlace(current: string, next: string): boolean {
@@ -47,14 +52,17 @@ export const presentations: PresentationStrategies = {
   auto() {
     return {
       id: "auto",
-      plan: ({ current, nextKind }) => canEditInPlace(current.kind, nextKind) ? "edit" : "replace",
-      fallbackAfterEditError: error => isRecoverableEditError(error) ? "replace" : "throw",
+      plan: ({ current, nextKind }) =>
+        canEditInPlace(current.kind, nextKind) ? "edit" : "replace",
+      fallbackAfterEditError: (error) =>
+        isRecoverableEditError(error) ? "replace" : "throw",
     };
   },
   edit(options = {}) {
     return {
       id: "edit",
-      plan: ({ current, nextKind }) => canEditInPlace(current.kind, nextKind) ? "edit" : "replace",
+      plan: ({ current, nextKind }) =>
+        canEditInPlace(current.kind, nextKind) ? "edit" : "replace",
       fallbackAfterEditError: () => options.fallback ?? "throw",
     };
   },
@@ -86,5 +94,5 @@ export const closeStrategies: CloseStrategies = {
   keep: () => ({ id: "keep", plan: () => "keep" }),
   detach: () => ({ id: "detach", plan: () => "detach" }),
   delete: () => ({ id: "delete", plan: () => "delete" }),
-  custom: strategy => strategy,
+  custom: (strategy) => strategy,
 };

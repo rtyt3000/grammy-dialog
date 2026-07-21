@@ -7,21 +7,15 @@ import {
 } from "../core.js";
 import { dialogs } from "../integration/grammy-plugin.js";
 import { DefinitionRegistry } from "../runtime/definition-registry.js";
-import { builtInUi } from "./built-in-widgets.js";
 import type {
   DialogCatalog,
   DialogExtension,
   DialogExtensionContext,
   DialogKit,
   DialogKitMiddlewareOptions,
-  WidgetCatalog,
   WindowCatalog,
 } from "./contracts.js";
-import {
-  widgetDefinitionDsl,
-  createDialogFactory,
-  type WindowFactory,
-} from "./definition-dsl.js";
+import { createDialogFactory, type WindowFactory } from "./definition-dsl.js";
 import { freezeContribution } from "./extension.js";
 import { access, scopes } from "../policies/scope-access.js";
 import { inputRouting } from "../input-routing/strategies.js";
@@ -43,30 +37,26 @@ function mergeCatalog(
 function buildDialogKit<
   C extends Context,
   Services,
-  Widgets extends WidgetCatalog,
   Dialogs extends DialogCatalog,
   Windows extends WindowCatalog,
 >(
-  widgets: Widgets,
   registeredDialogs: Dialogs,
   registeredWindows: Windows,
-): DialogKit<C, Services, Widgets, Dialogs, Windows> {
+): DialogKit<C, Services, Dialogs, Windows> {
   const viewModel = createViewModelFactory<C, Services>();
   const windowFactory = window as WindowFactory<C, Services>;
-  const dialogFactory = createDialogFactory(windowFactory, widgets, builtInUi);
+  const dialogFactory = createDialogFactory(windowFactory);
   const resources = Object.freeze([
     ...Object.values(registeredDialogs),
     ...Object.values(registeredWindows),
-  ]) as DialogKit<C, Services, Widgets, Dialogs, Windows>["resources"];
+  ]) as DialogKit<C, Services, Dialogs, Windows>["resources"];
   // Validate ids and initial-window references while composing the kit, before a bot exists.
   new DefinitionRegistry<C>(resources);
 
-  const kit: DialogKit<C, Services, Widgets, Dialogs, Windows> = {
+  const kit: DialogKit<C, Services, Dialogs, Windows> = {
     viewModel,
     window: windowFactory,
     dialog: dialogFactory,
-    widgets,
-    ui: builtInUi,
     scope: scopes,
     access,
     presentation: presentations,
@@ -74,35 +64,43 @@ function buildDialogKit<
     inputRouting,
     dialogs: registeredDialogs,
     windows: registeredWindows,
-    widget: widgetDefinitionDsl.widget,
     resources,
 
     extension(factory, options = {}) {
       return Object.freeze({
         name: options.name,
-        contribution: freezeContribution(factory({
-          viewModel,
-          window: windowFactory,
-          dialog: dialogFactory,
-          widgets,
-          ui: builtInUi,
-          scope: scopes,
-          access,
-          widget: widgetDefinitionDsl.widget,
-        } as DialogExtensionContext<C, Services, Widgets>)),
+        contribution: freezeContribution(
+          factory({
+            viewModel,
+            window: windowFactory,
+            dialog: dialogFactory,
+            scope: scopes,
+            access,
+          } as DialogExtensionContext<C, Services>),
+        ),
       });
     },
 
-    use<
-      AddedWidgets extends WidgetCatalog,
-      AddedDialogs extends DialogCatalog,
-      AddedWindows extends WindowCatalog,
-    >(extension: DialogExtension<AddedWidgets, AddedDialogs, AddedWindows>) {
+    use<AddedDialogs extends DialogCatalog, AddedWindows extends WindowCatalog>(
+      extension: DialogExtension<AddedDialogs, AddedWindows>,
+    ) {
       const contribution = extension.contribution;
-      return buildDialogKit<C, Services, Widgets & AddedWidgets, Dialogs & AddedDialogs, Windows & AddedWindows>(
-        mergeCatalog("widget", widgets, contribution.widgets) as Widgets & AddedWidgets,
-        mergeCatalog("dialog", registeredDialogs, contribution.dialogs) as Dialogs & AddedDialogs,
-        mergeCatalog("window", registeredWindows, contribution.windows) as Windows & AddedWindows,
+      return buildDialogKit<
+        C,
+        Services,
+        Dialogs & AddedDialogs,
+        Windows & AddedWindows
+      >(
+        mergeCatalog(
+          "dialog",
+          registeredDialogs,
+          contribution.dialogs,
+        ) as Dialogs & AddedDialogs,
+        mergeCatalog(
+          "window",
+          registeredWindows,
+          contribution.windows,
+        ) as Windows & AddedWindows,
       );
     },
 
@@ -115,14 +113,17 @@ function buildDialogKit<
         viewModel,
         window: windowFactory,
         dialog: dialogFactory,
-        widgets,
-        ui: builtInUi,
         scope: scopes,
         access,
-        widget: widgetDefinitionDsl.widget,
       });
-      const addedDialogs: Record<string, DialogDefinition<any, any, any, any>> = {};
-      const addedWindows: Record<string, WindowDefinition<any, any, any, any>> = {};
+      const addedDialogs: Record<
+        string,
+        DialogDefinition<any, any, any, any>
+      > = {};
+      const addedWindows: Record<
+        string,
+        WindowDefinition<any, any, any, any>
+      > = {};
       for (const [name, resource] of Object.entries(catalog)) {
         if (resource.kind === "dialog") addedDialogs[name] = resource;
         else addedWindows[name] = resource;
@@ -147,9 +148,8 @@ function buildDialogKit<
 export function createDialogKit<
   C extends Context = Context,
   Services = unknown,
->(): DialogKit<C, Services, {}> {
-  return buildDialogKit<C, Services, {}, {}, {}>(
-    Object.freeze({}),
+>(): DialogKit<C, Services> {
+  return buildDialogKit<C, Services, {}, {}>(
     Object.freeze({}),
     Object.freeze({}),
   );

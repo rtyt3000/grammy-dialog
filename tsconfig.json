@@ -13,8 +13,11 @@
     "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
-      "@ppsh/grammy-dialog": ["./src/index.ts"]
+      "@ppsh/grammy-dialog": ["./src/index.ts"],
+      "@ppsh/grammy-dialog/jsx-runtime": ["./src/jsx-runtime.ts"],
+      "@ppsh/grammy-dialog/jsx-dev-runtime": ["./src/jsx-dev-runtime.ts"]
     },
+    "jsxImportSource": "@ppsh/grammy-dialog",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,

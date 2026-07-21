@@ -1,5 +1,8 @@
 import type { Awaitable } from "../core.js";
-import type { InstanceRecord, SurfaceReference } from "../persistence/storage.js";
+import type {
+  InstanceRecord,
+  SurfaceReference,
+} from "../persistence/storage.js";
 
 /** Telegram surface kind currently mounted by an instance. */
 export type SurfaceKind = SurfaceReference["kind"];

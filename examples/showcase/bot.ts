@@ -8,24 +8,26 @@ import { services } from "./services.js";
 export function createShowcaseBot(token: string) {
   const bot = new Bot<AppContext>(token);
 
-  bot.use(appDialogs.middleware({
-    services,
-    i18n: {
-      adapter: translationAdapter,
-      locale: {
-        resolve: ctx => ctx.from?.language_code === "pl" ? "pl" : "en",
+  bot.use(
+    appDialogs.middleware({
+      services,
+      i18n: {
+        adapter: translationAdapter,
+        locale: {
+          resolve: (ctx) => (ctx.from?.language_code === "pl" ? "pl" : "en"),
+        },
       },
-    },
-    defaults: {
-      presentation: appDialogs.presentation.auto(),
-      close: appDialogs.close.detach(),
-      inputRouting: appDialogs.inputRouting.replyOrFocused(),
-    },
-  }));
-  bot.command("profile", ctx => ctx.dialog.start(appDialogs.dialogs.profile));
-  bot.command("poll", ctx => ctx.dialog.start(appDialogs.dialogs.teamPoll));
-  bot.command("counter", ctx => ctx.ui.show(appDialogs.windows.counterCard));
-  bot.command("report", ctx => ctx.ui.show(appDialogs.windows.reportReady));
+      defaults: {
+        presentation: appDialogs.presentation.auto(),
+        close: appDialogs.close.detach(),
+        inputRouting: appDialogs.inputRouting.replyOrFocused(),
+      },
+    }),
+  );
+  bot.command("profile", (ctx) => ctx.dialog.start(appDialogs.dialogs.profile));
+  bot.command("poll", (ctx) => ctx.dialog.start(appDialogs.dialogs.teamPoll));
+  bot.command("counter", (ctx) => ctx.ui.show(appDialogs.windows.counterCard));
+  bot.command("report", (ctx) => ctx.ui.show(appDialogs.windows.reportReady));
 
   return { bot };
 }

@@ -3,12 +3,15 @@ import { Bot } from "grammy";
 import { prepareBot } from "grammy-testing";
 import {
   back,
-  button,
+  Button,
   defineDialog,
   defineInputWidget,
   dialogs,
   go,
+  Keyboard,
+  Row,
   textInput,
+  Text,
   valid,
   viewModel,
   window,
@@ -22,24 +25,45 @@ describe("navigation and input", () => {
       load: ({ state }) => state,
       intents: {
         saveName({ state, value }) {
-          state.update(current => ({ ...current, name: String(value) }));
+          state.update((current) => ({ ...current, name: String(value) }));
         },
       },
     });
     const main = window("form.main", {
       viewModel: formVm,
-      text: "Profile",
-      keyboard: [[button("Edit", go("edit"))]],
+      view: (
+        <>
+          <Text>Profile</Text>
+          <Keyboard>
+            <Row>
+              <Button action={go("edit")}>Edit</Button>
+            </Row>
+          </Keyboard>
+        </>
+      ),
     });
     const edit = window("form.edit", {
       viewModel: formVm,
-      text: ({ vm }) => vm.name === "" ? "Enter name" : `Name: ${vm.name}`,
-      keyboard: [[button("Back", back())]],
-      input: [textInput("name", {
-        trim: true,
-        validate: value => value.length > 1 ? valid(value) : { ok: false, message: "Too short" },
-        onReceive: "saveName",
-      })],
+      view: ({ vm }) => (
+        <>
+          <Text>{vm.name === "" ? "Enter name" : `Name: ${vm.name}`}</Text>
+          <Keyboard>
+            <Row>
+              <Button action={back()}>Back</Button>
+            </Row>
+          </Keyboard>
+        </>
+      ),
+      input: [
+        textInput("name", {
+          trim: true,
+          validate: (value) =>
+            value.length > 1
+              ? valid(value)
+              : { ok: false, message: "Too short" },
+          onReceive: "saveName",
+        }),
+      ],
     });
     const form = defineDialog({
       id: "form",
@@ -49,7 +73,7 @@ describe("navigation and input", () => {
     });
     const bot = new Bot<TestContext>("test-token");
     bot.use(dialogs<TestContext>({ list: [form] }));
-    bot.command("form", ctx => ctx.dialog.start("form"));
+    bot.command("form", (ctx) => ctx.dialog.start("form"));
 
     const { chats } = await prepareBot(bot);
     const user = chats.newUser();
@@ -62,26 +86,26 @@ describe("navigation and input", () => {
 
   test("accepts a user-defined input widget", async () => {
     const hashtagInput = defineInputWidget<Record<never, never>, string>()({
-      match: ctx => ctx.message?.text?.startsWith("#") ?? false,
-      parse: ctx => ctx.message!.text!.slice(1),
+      match: (ctx) => ctx.message?.text?.startsWith("#") ?? false,
+      parse: (ctx) => ctx.message!.text!.slice(1),
     });
     const vm = viewModel({
       initialState: { tag: "none" },
       load: ({ state }) => state,
       intents: {
         setTag({ state, value }) {
-          state.update(current => ({ ...current, tag: String(value) }));
+          state.update((current) => ({ ...current, tag: String(value) }));
         },
       },
     });
     const inputWindow = window("custom-input", {
       viewModel: vm,
-      text: ({ vm }) => `Tag: ${vm.tag}`,
+      view: ({ vm }) => <Text>Tag: {vm.tag}</Text>,
       input: [hashtagInput("hashtag", vm.actions.setTag, {})],
     });
     const bot = new Bot<TestContext>("test-token");
     bot.use(dialogs<TestContext>({ list: [inputWindow] }));
-    bot.command("input", ctx => ctx.ui.show("custom-input"));
+    bot.command("input", (ctx) => ctx.ui.show("custom-input"));
 
     const { chats } = await prepareBot(bot);
     const user = chats.newUser();
@@ -94,8 +118,16 @@ describe("navigation and input", () => {
     const vm = viewModel({ initialState: {} });
     const main = window("limited.main", {
       viewModel: vm,
-      text: "Limited",
-      keyboard: [[button("Push", go("main"))]],
+      view: (
+        <>
+          <Text>Limited</Text>
+          <Keyboard>
+            <Row>
+              <Button action={go("main")}>Push</Button>
+            </Row>
+          </Keyboard>
+        </>
+      ),
     });
     const limited = defineDialog({
       id: "limited",
@@ -104,12 +136,13 @@ describe("navigation and input", () => {
     });
     const bot = new Bot<TestContext>("test-token");
     bot.use(dialogs<TestContext>({ list: [limited], maxStackDepth: 1 }));
-    bot.command("limited", ctx => ctx.dialog.start(limited));
+    bot.command("limited", (ctx) => ctx.dialog.start(limited));
     const { chats } = await prepareBot(bot);
     const user = chats.newUser();
     await user.sendCommand("limited");
 
-    await expect(user.replies.lastOrThrow().clickButton("Push"))
-      .rejects.toThrow("exceeded the stack depth limit of 1");
+    await expect(
+      user.replies.lastOrThrow().clickButton("Push"),
+    ).rejects.toThrow("exceeded the stack depth limit of 1");
   });
 });

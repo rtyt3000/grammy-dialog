@@ -5,6 +5,75 @@
  */
 
 export { createDialogKit } from "./kit/dialog-kit.js";
+export { bind, type InputBindings } from "./bindings.js";
+export {
+  defineInputWidget,
+  defineWidget,
+  type InputWidgetFactory,
+  type StatefulWidgetComponent,
+  type WidgetMountProps,
+} from "./widgets.js";
+export {
+  Animation,
+  Audio,
+  B,
+  Blockquote,
+  Br,
+  Button,
+  Code,
+  ContactInput,
+  Document,
+  DocumentInput,
+  I,
+  Input,
+  Keyboard,
+  Link,
+  LocationInput,
+  MessageInput,
+  Photo,
+  PhotoInput,
+  Pre,
+  Row,
+  S,
+  Spoiler,
+  StickerInput,
+  Text,
+  TextInput,
+  U,
+  UrlButton,
+  Video,
+  VideoInput,
+  Voice,
+  VoiceInput,
+  Widget,
+  Window,
+  AnimationInput,
+  AudioInput,
+  type AttachmentInputProps,
+  type ButtonProps,
+  type ChildrenProps,
+  type MediaProps,
+  type TextInputProps,
+  type UrlButtonProps,
+  type WidgetProps,
+} from "./jsx/elements.js";
+export type {
+  JsxComponent,
+  JsxElement,
+  JsxNode,
+  JsxViewSource,
+} from "./jsx/types.js";
+export {
+  back,
+  close,
+  go,
+  intent,
+  replace,
+  reset,
+  type ButtonAction,
+  type IntentAction,
+  type NavigationAction,
+} from "./definitions/actions.js";
 export {
   defineDialogExtension,
   type StandaloneExtensionContext,
@@ -18,7 +87,6 @@ export type {
   DialogKitMiddlewareOptions,
   DialogsFrom,
   ResourceCatalog,
-  WidgetCatalog,
   WindowCatalog,
   WindowsFrom,
 } from "./kit/contracts.js";
@@ -27,15 +95,8 @@ export type {
   DialogFactory,
   DialogWindowFactory,
   DialogWindowsContext,
-  WidgetDefinitionDsl,
   WindowFactory,
 } from "./kit/definition-dsl.js";
-export type {
-  BuiltInUiCatalog,
-  InputFactory,
-  IntentButtonFactory,
-  TextInputFactory,
-} from "./kit/built-in-widgets.js";
 
 export type {
   DialogController,
@@ -73,17 +134,22 @@ export type {
   CallbackCodecOptions,
 } from "./callbacks/codec.js";
 
-export type {
-  AnimationInputValue,
-  AudioInputValue,
-  ContactInputValue,
-  FileInputValue,
-  LocationInputValue,
-  MessageInputValue,
-  PhotoInputValue,
-  StickerInputValue,
-  VideoInputValue,
-  VoiceInputValue,
+export {
+  invalid,
+  valid,
+  type InputValidation,
+  type InputValidationFailure,
+  type InputValidationSuccess,
+  type AnimationInputValue,
+  type AudioInputValue,
+  type ContactInputValue,
+  type FileInputValue,
+  type LocationInputValue,
+  type MessageInputValue,
+  type PhotoInputValue,
+  type StickerInputValue,
+  type VideoInputValue,
+  type VoiceInputValue,
 } from "./definitions/input.js";
 export type {
   IntentContext,

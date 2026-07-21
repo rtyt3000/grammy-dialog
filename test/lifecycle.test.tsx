@@ -2,12 +2,15 @@ import { describe, expect, test } from "bun:test";
 import { Bot } from "grammy";
 import { prepareBot } from "grammy-testing";
 import {
-  button,
+  Button,
   close,
   closeStrategies,
   dialogs,
+  Keyboard,
   MemoryStorageAdapter,
+  Row,
   textInput,
+  Text,
   viewModel,
   window,
   type CloseStrategy,
@@ -28,13 +31,13 @@ describe("instance lifecycle", () => {
     });
     const inputOnly = window("input-only", {
       viewModel: closeVm,
-      text: "Send anything to close",
+      view: <Text>Send anything to close</Text>,
       input: [textInput("finish", { onReceive: "finish" })],
     });
     const storage = new MemoryStorageAdapter<DialogStorageRecord>();
     const bot = new Bot<TestContext>("test-token");
     bot.use(dialogs<TestContext>({ list: [inputOnly], storage }));
-    bot.command("close", ctx => ctx.ui.show("input-only"));
+    bot.command("close", (ctx) => ctx.ui.show("input-only"));
 
     const { chats } = await prepareBot(bot);
     const user = chats.newUser();
@@ -43,47 +46,77 @@ describe("instance lifecycle", () => {
     await user.sendText("done");
 
     expect(chats.outgoing.getMethods()).not.toContain("editMessageReplyMarkup");
-    const instance = [...storage.readAllValues()].find(record => record.type === "instance");
-    expect(instance?.type === "instance" ? instance.value.status : undefined).toBe("closed");
-    expect([...storage.readAllKeys()].some(key => key.startsWith("gd:focus:"))).toBe(false);
+    const instance = [...storage.readAllValues()].find(
+      (record) => record.type === "instance",
+    );
+    expect(
+      instance?.type === "instance" ? instance.value.status : undefined,
+    ).toBe("closed");
+    expect(
+      [...storage.readAllKeys()].some((key) => key.startsWith("gd:focus:")),
+    ).toBe(false);
   });
 
   async function closeWith(strategy: CloseStrategy) {
-    const vm = viewModel({ initialState: {}, load: ({ state }) => state, intents: {} });
+    const vm = viewModel({
+      initialState: {},
+      load: ({ state }) => state,
+      intents: {},
+    });
     const closeWindow = window("close-window", {
       viewModel: vm,
-      text: "Close me",
-      keyboard: [[button("Close", close())]],
+      view: (
+        <>
+          <Text>Close me</Text>
+          <Keyboard>
+            <Row>
+              <Button action={close()}>Close</Button>
+            </Row>
+          </Keyboard>
+        </>
+      ),
     });
     const storage = new JsonStorageAdapter<DialogStorageRecord>();
     const bot = new Bot<TestContext>("test-token");
-    bot.use(dialogs<TestContext>({
-      list: [closeWindow],
-      storage,
-      defaults: { close: strategy },
-    }));
-    bot.command("close", ctx => ctx.ui.show("close-window"));
+    bot.use(
+      dialogs<TestContext>({
+        list: [closeWindow],
+        storage,
+        defaults: { close: strategy },
+      }),
+    );
+    bot.command("close", (ctx) => ctx.ui.show("close-window"));
     const { chats } = await prepareBot(bot);
     const user = chats.newUser();
     await user.sendCommand("close");
     const reply = user.replies.lastOrThrow();
     chats.outgoing.clear();
     await reply.clickButton("Close");
-    const instance = [...storage.readAllValues()].find(record => record.type === "instance");
+    const instance = [...storage.readAllValues()].find(
+      (record) => record.type === "instance",
+    );
     return { chats, instance };
   }
 
   test("delete close strategy removes the surface", async () => {
     const { chats, instance } = await closeWith(closeStrategies.delete());
     expect(chats.outgoing.getMethods()).toContain("deleteMessage");
-    expect(instance?.type === "instance" ? instance.value.surface : null).toBeUndefined();
+    expect(
+      instance?.type === "instance" ? instance.value.surface : null,
+    ).toBeUndefined();
   });
 
   test("keep close strategy leaves the surface untouched", async () => {
     const { chats, instance } = await closeWith(closeStrategies.keep());
     expect(chats.outgoing.getMethods()).not.toContain("deleteMessage");
     expect(chats.outgoing.getMethods()).not.toContain("editMessageReplyMarkup");
-    expect(instance?.type === "instance" ? instance.value.callbackTokens : null).toEqual([]);
-    expect(instance?.type === "instance" ? instance.value.surface?.hasKeyboard : null).toBe(true);
+    expect(
+      instance?.type === "instance" ? instance.value.callbackTokens : null,
+    ).toEqual([]);
+    expect(
+      instance?.type === "instance"
+        ? instance.value.surface?.hasKeyboard
+        : null,
+    ).toBe(true);
   });
 });

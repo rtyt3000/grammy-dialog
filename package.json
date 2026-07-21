@@ -10,6 +10,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./jsx-runtime": {
+      "types": "./dist/jsx-runtime.d.ts",
+      "import": "./dist/jsx-runtime.js"
+    },
+    "./jsx-dev-runtime": {
+      "types": "./dist/jsx-dev-runtime.d.ts",
+      "import": "./dist/jsx-dev-runtime.js"
     }
   },
   "files": [
@@ -22,13 +30,17 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "bun test",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
+    "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
     "typecheck:api": "tsc -p tsconfig.type-tests.json",
     "typecheck:package": "tsc -p tsconfig.package-smoke.json",
-    "check": "bun run typecheck && bun run typecheck:api && bun test && bun run build && bun run typecheck:package",
+    "check": "bun run lint && bun run typecheck && bun run typecheck:api && bun test && bun run build && bun run typecheck:package",
     "prepack": "bun run check"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.4",
     "@types/bun": "latest",
     "grammy": "^1.45.0",
     "grammy-testing": "^0.26.0",

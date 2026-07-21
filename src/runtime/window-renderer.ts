@@ -5,6 +5,7 @@ import {
   type KeyboardDefinition,
   type KeyboardNode,
   type KeyboardWidgetInstance,
+  type InputDefinition,
   type RenderContext,
   StateHandle,
   type TextSource,
@@ -15,6 +16,7 @@ import type { AnyWindow, DefinitionRegistry } from "./definition-registry.js";
 import type { DialogRepository } from "../persistence/dialog-repository.js";
 import type { CallbackRecord, InstanceRecord } from "../persistence/storage.js";
 import type { MediaKind } from "../core.js";
+import { renderJsxKeyboard, renderJsxView } from "../jsx/render.js";
 
 /** Resolved media ready to pass to the Telegram Bot API. */
 export interface RenderedMedia {
@@ -32,10 +34,7 @@ export interface RenderedWindow {
 }
 
 /** Dependencies required to render windows and register their callbacks. */
-export interface WindowRendererOptions<
-  C extends Context,
-  Services,
-> {
+export interface WindowRendererOptions<C extends Context, Services> {
   registry: DefinitionRegistry<C>;
   repository: DialogRepository;
   services: Services;
@@ -45,10 +44,7 @@ export interface WindowRendererOptions<
 }
 
 /** Resolves ViewModels, translations, media, keyboards, and widget state. */
-export class WindowRenderer<
-  C extends Context = Context,
-  Services = unknown,
-> {
+export class WindowRenderer<C extends Context = Context, Services = unknown> {
   private readonly registry: DefinitionRegistry<C>;
   private readonly repository: DialogRepository;
   private readonly services: Services;
@@ -66,32 +62,42 @@ export class WindowRenderer<
   }
 
   /** Renders the current stack window and persists generated callback bindings. */
-  public async render(instance: InstanceRecord, ctx?: C): Promise<RenderedWindow> {
+  public async render(
+    instance: InstanceRecord,
+    ctx?: C,
+  ): Promise<RenderedWindow> {
     const selectedWindow = this.registry.currentWindow(instance);
-    const renderContext = await this.createContext(instance, selectedWindow, ctx);
-    const text = selectedWindow.text === undefined
-      ? ""
-      : await this.resolveText(selectedWindow.text, renderContext);
-    const media = selectedWindow.media === undefined
-      ? undefined
-      : typeof selectedWindow.media === "function"
-        ? await selectedWindow.media(renderContext)
-        : selectedWindow.media;
-    const mediaSource = media === undefined
-      ? undefined
-      : typeof media.source === "function"
-        ? await media.source(renderContext)
-        : media.source;
-    const renderedMedia = media === undefined || mediaSource === undefined
-      ? undefined
-      : { kind: media.kind, source: mediaSource };
-    const keyboard = selectedWindow.keyboard === undefined
-      ? []
-      : typeof selectedWindow.keyboard === "function"
-        ? await selectedWindow.keyboard(renderContext)
-        : selectedWindow.keyboard;
-    this.assertUniqueWidgetIds(keyboard);
-    const rows = await this.renderKeyboardNode(instance, keyboard, renderContext);
+    const renderContext = await this.createContext(
+      instance,
+      selectedWindow,
+      ctx,
+    );
+    const jsxView = await renderJsxView(
+      selectedWindow.view === undefined
+        ? null
+        : typeof selectedWindow.view === "function"
+          ? await selectedWindow.view(renderContext)
+          : selectedWindow.view,
+    );
+    const text = jsxView.text;
+    const media = jsxView.media;
+    const mediaSource =
+      media === undefined
+        ? undefined
+        : typeof media.source === "function"
+          ? await media.source(renderContext)
+          : media.source;
+    const renderedMedia =
+      media === undefined || mediaSource === undefined
+        ? undefined
+        : { kind: media.kind, source: mediaSource };
+    const keyboard = jsxView.keyboard;
+    const rows = await this.renderKeyboardNode(
+      instance,
+      keyboard,
+      renderContext,
+      new Map(),
+    );
     const callbackTokens: string[] = [];
     const inlineKeyboard: InlineKeyboardMarkup["inline_keyboard"] = [];
 
@@ -100,9 +106,10 @@ export class WindowRenderer<
       for (const [columnIndex, definition] of row.entries()) {
         const label = await this.resolveText(definition.text, renderContext);
         if (definition.kind === "url") {
-          const url = typeof definition.url === "function"
-            ? await definition.url(renderContext)
-            : definition.url;
+          const url =
+            typeof definition.url === "function"
+              ? await definition.url(renderContext)
+              : definition.url;
           renderedRow.push({ text: label, url });
           continue;
         }
@@ -126,11 +133,53 @@ export class WindowRenderer<
 
     return {
       text,
-      parseMode: selectedWindow.parseMode,
+      parseMode: "HTML",
       media: renderedMedia,
-      replyMarkup: inlineKeyboard.length === 0 ? undefined : { inline_keyboard: inlineKeyboard },
+      replyMarkup:
+        inlineKeyboard.length === 0
+          ? undefined
+          : { inline_keyboard: inlineKeyboard },
       callbackTokens,
     };
+  }
+
+  /** Resolves the keyboard tree used by callback action execution. */
+  public async resolveKeyboard(
+    selectedWindow: AnyWindow<C>,
+    context: RenderContext<C, any, Services>,
+  ): Promise<KeyboardNode<C, any, Services>> {
+    const node =
+      selectedWindow.view === undefined
+        ? null
+        : typeof selectedWindow.view === "function"
+          ? await selectedWindow.view(context)
+          : selectedWindow.view;
+    return (await renderJsxView(node)).keyboard as KeyboardNode<
+      C,
+      any,
+      Services
+    >;
+  }
+
+  /** Resolves input bindings declared statically and inside the JSX view. */
+  public async resolveInputs(
+    instance: InstanceRecord,
+    selectedWindow: AnyWindow<C>,
+    ctx?: C,
+  ): Promise<ReadonlyArray<InputDefinition<C>>> {
+    const context = await this.createContext(instance, selectedWindow, ctx);
+    const node =
+      selectedWindow.view === undefined
+        ? null
+        : typeof selectedWindow.view === "function"
+          ? await selectedWindow.view(context)
+          : selectedWindow.view;
+    return [
+      ...(selectedWindow.input ?? []),
+      ...((await renderJsxView(node)).inputs as ReadonlyArray<
+        InputDefinition<C>
+      >),
+    ];
   }
 
   /** Loads a ViewModel and constructs its render context. */
@@ -173,16 +222,24 @@ export class WindowRenderer<
     widget: KeyboardWidgetInstance<C, any, Services, any, any>,
   ): StateHandle<any> {
     let record = instance.widgetStates[widget.id];
-    if (record === undefined || record.version !== widget.definition.state.version) {
+    if (
+      record === undefined ||
+      record.version !== widget.definition.state.version
+    ) {
       record = {
         version: widget.definition.state.version,
-        value: record === undefined || widget.definition.state.migrate === undefined
-          ? widget.definition.state.initial(widget.props)
-          : widget.definition.state.migrate(record.value, record.version, widget.props),
+        value:
+          record === undefined || widget.definition.state.migrate === undefined
+            ? widget.definition.state.initial(widget.props)
+            : widget.definition.state.migrate(
+                record.value,
+                record.version,
+                widget.props,
+              ),
       };
       instance.widgetStates[widget.id] = record;
     }
-    return new StateHandle(record.value, value => {
+    return new StateHandle(record.value, (value) => {
       instance.widgetStates[widget.id] = {
         version: widget.definition.state.version,
         value,
@@ -194,32 +251,48 @@ export class WindowRenderer<
   public isKeyboardWidget(
     node: KeyboardNode<C, any, Services>,
   ): node is KeyboardWidgetInstance<C, any, Services, any, any> {
-    return !Array.isArray(node) && (node as { kind?: string }).kind === "keyboard-widget";
+    return (
+      !Array.isArray(node) &&
+      (node as { kind?: string }).kind === "keyboard-widget"
+    );
   }
 
   /** Narrows a keyboard node to a composition group. */
   public isKeyboardGroup(
     node: KeyboardNode<C, any, Services>,
-  ): node is Extract<KeyboardNode<C, any, Services>, { kind: "keyboard-group" }> {
-    return !Array.isArray(node) && (node as { kind?: string }).kind === "keyboard-group";
+  ): node is Extract<
+    KeyboardNode<C, any, Services>,
+    { kind: "keyboard-group" }
+  > {
+    return (
+      !Array.isArray(node) &&
+      (node as { kind?: string }).kind === "keyboard-group"
+    );
   }
 
   private async renderKeyboardNode(
     instance: InstanceRecord,
     node: KeyboardNode<C, any, Services>,
     context: RenderContext<C, any, Services>,
+    widgets: Map<string, KeyboardWidgetInstance<C, any, Services, any, any>>,
   ): Promise<KeyboardDefinition<C, any, Services>> {
     if (Array.isArray(node)) return node;
     if (this.isKeyboardGroup(node)) {
       const rows: KeyboardDefinition<C, any, Services>[] = await Promise.all(
-        node.children.map(child => this.renderKeyboardNode(instance, child, context)),
+        node.children.map((child) =>
+          this.renderKeyboardNode(instance, child, context, widgets),
+        ),
       );
       return rows.flat();
     }
     const widget = node as KeyboardWidgetInstance<C, any, Services, any, any>;
+    if (widgets.has(widget.id)) {
+      throw new Error(`Duplicate keyboard widget id: ${widget.id}`);
+    }
+    widgets.set(widget.id, widget);
     const state = this.widgetState(instance, widget);
     const actions = Object.fromEntries(
-      Object.keys(widget.definition.actions).map(action => [
+      Object.keys(widget.definition.actions).map((action) => [
         action,
         (payload?: unknown) => ({
           kind: "widget" as const,
@@ -229,45 +302,37 @@ export class WindowRenderer<
         }),
       ]),
     );
-    return widget.definition.render({
+    const rendered = await widget.definition.render({
       ...context,
       props: widget.props,
       state,
       actions,
     });
+    return this.renderKeyboardNode(
+      instance,
+      (await renderJsxKeyboard(rendered)) as KeyboardNode<C, any, Services>,
+      context,
+      widgets,
+    );
   }
 
-  /** Finds one mounted stateful widget anywhere in a composed keyboard tree. */
-  public findKeyboardWidget(
+  /** Expands the rendered widget tree and finds one uniquely mounted widget. */
+  public async findKeyboardWidget(
+    instance: InstanceRecord,
     node: KeyboardNode<C, any, Services>,
+    context: RenderContext<C, any, Services>,
     id: string,
-  ): KeyboardWidgetInstance<C, any, Services, any, any> | undefined {
-    if (Array.isArray(node)) return undefined;
-    if (this.isKeyboardGroup(node)) {
-      for (const child of node.children) {
-        const found = this.findKeyboardWidget(child, id);
-        if (found !== undefined) return found;
-      }
-      return undefined;
-    }
-    return this.isKeyboardWidget(node) && node.id === id ? node : undefined;
-  }
-
-  private assertUniqueWidgetIds(node: KeyboardNode<C, any, Services>): void {
-    const ids = new Set<string>();
-    const visit = (current: KeyboardNode<C, any, Services>): void => {
-      if (this.isKeyboardWidget(current)) {
-        if (ids.has(current.id)) throw new Error(`Duplicate keyboard widget id: ${current.id}`);
-        ids.add(current.id);
-        return;
-      }
-      if (this.isKeyboardGroup(current)) current.children.forEach(visit);
-    };
-    visit(node);
+  ): Promise<KeyboardWidgetInstance<C, any, Services, any, any> | undefined> {
+    const widgets = new Map<
+      string,
+      KeyboardWidgetInstance<C, any, Services, any, any>
+    >();
+    await this.renderKeyboardNode(instance, node, context, widgets);
+    return widgets.get(id);
   }
 
   private instanceState(instance: InstanceRecord): StateHandle<any> {
-    return new StateHandle(instance.state, state => {
+    return new StateHandle(instance.state, (state) => {
       instance.state = state;
     });
   }
@@ -282,7 +347,9 @@ export class WindowRenderer<
     params?: Record<string, unknown>,
   ): Promise<string> {
     if (this.translator === undefined) {
-      throw new Error(`Translation '${key}' was requested, but no i18n adapter is configured`);
+      throw new Error(
+        `Translation '${key}' was requested, but no i18n adapter is configured`,
+      );
     }
     return this.translator.translate(locale, key, params);
   }

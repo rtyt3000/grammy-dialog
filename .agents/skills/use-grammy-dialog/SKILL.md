@@ -21,7 +21,7 @@ Treat the library as experimental and verify the installed or checked-out versio
 - Use a Dialog for a multi-window workflow with one shared ViewModel, state, and navigation stack.
 - Use a standalone Window for an independent surface. Omit its ViewModel when it is static.
 - Use a custom widget for reusable UI behavior nested inside windows.
-- Use an extension to package reusable widgets or registered resources for multiple DialogKits.
+- Export reusable widgets as JSX components; use extensions to package registered dialogs/windows for multiple DialogKits.
 
 Read [core-dialogs.md](references/core-dialogs.md) for setup, ViewModels, windows, typed intents/inputs, registration, middleware, and i18n.
 
@@ -51,7 +51,7 @@ Read [runtime-policies.md](references/runtime-policies.md) when configuring stor
 
 ## Extend deliberately
 
-Keep ordinary app dialogs/windows in `define()`. Use `defineDialogExtension()` for portable third-party-style extensions, or `kit.extend()` for app-local extensions. Give each mounted stateful widget a stable ID unique within its rendered keyboard tree, and provide migration logic when changing its persisted state version.
+Keep ordinary app dialogs/windows in `define()`. Use `defineDialogExtension()` for portable third-party-style registered resources, or `kit.extend()` for app-local resources. Give each mounted stateful widget a stable ID unique within its rendered keyboard tree, and provide migration logic when changing its persisted state version.
 
 Read [extensions-widgets.md](references/extensions-widgets.md) before creating custom widgets or extensions.
 

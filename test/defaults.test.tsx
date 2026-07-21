@@ -2,11 +2,15 @@ import { describe, expect, test } from "bun:test";
 import { Bot } from "grammy";
 import { prepareBot } from "grammy-testing";
 import {
-  button,
-  defineKeyboardWidget,
+  Button,
+  defineWidget,
   defineDialog,
   dialogs,
+  intent,
+  Keyboard,
+  Row,
   textInput,
+  Text,
   viewModel,
   window,
   type DialogStorageRecord,
@@ -19,19 +23,31 @@ describe("DSL defaults", () => {
       initialState: { count: 0 },
       intents: {
         increment({ state }) {
-          state.update(current => ({ count: current.count + 1 }));
+          state.update((current) => ({ count: current.count + 1 }));
         },
       },
     });
     const main = window("defaults.main", {
       viewModel: vm,
-      text: ({ vm }) => `Count: ${vm.count}`,
-      keyboard: [[button("Increment", "increment")]],
+      view: ({ vm: view }) => (
+        <>
+          <Text>Count: {view.count}</Text>
+          <Keyboard>
+            <Row>
+              <Button action={intent(vm.actions.increment)}>Increment</Button>
+            </Row>
+          </Keyboard>
+        </>
+      ),
     });
-    const dialog = defineDialog({ id: "defaults", viewModel: vm, windows: { main } });
+    const dialog = defineDialog({
+      id: "defaults",
+      viewModel: vm,
+      windows: { main },
+    });
     const bot = new Bot<TestContext>("test-token");
     bot.use(dialogs<TestContext>({ list: [dialog] }));
-    bot.command("defaults", ctx => ctx.dialog.start("defaults"));
+    bot.command("defaults", (ctx) => ctx.dialog.start("defaults"));
     const { chats } = await prepareBot(bot);
     const user = chats.newUser();
 
@@ -47,51 +63,67 @@ describe("DSL defaults", () => {
       initialState: { value: "" },
       intents: {
         receive({ state, value }) {
-          state.update(current => ({ ...current, value: String(value) }));
+          state.update((current) => ({ ...current, value: String(value) }));
         },
       },
     });
     const inputWindow = window("default-input", {
       viewModel: vm,
-      text: ({ vm }) => vm.value,
+      view: ({ vm }) => <Text>{vm.value}</Text>,
       input: [textInput("receive")],
     });
     const storage = new JsonStorageAdapter<DialogStorageRecord>();
     const bot = new Bot<TestContext>("test-token");
     bot.use(dialogs<TestContext>({ list: [inputWindow], storage }));
-    bot.command("input", ctx => ctx.ui.show("default-input"));
+    bot.command("input", (ctx) => ctx.ui.show("default-input"));
     const { chats } = await prepareBot(bot);
     const user = chats.newUser();
 
     await user.sendCommand("input");
     await user.sendText("received");
 
-    const instance = [...storage.readAllValues()].find(record => record.type === "instance");
-    expect(instance?.type === "instance" ? instance.value.state : undefined)
-      .toEqual({ value: "received" });
+    const instance = [...storage.readAllValues()].find(
+      (record) => record.type === "instance",
+    );
+    expect(
+      instance?.type === "instance" ? instance.value.state : undefined,
+    ).toEqual({ value: "received" });
   });
 
   test("creates an empty ViewModel by default", async () => {
     const storage = new JsonStorageAdapter<DialogStorageRecord>();
     const vm = viewModel();
-    const staticWindow = window("empty-vm", { viewModel: vm, text: "Empty" });
+    const staticWindow = window("empty-vm", {
+      viewModel: vm,
+      view: <Text>Empty</Text>,
+    });
     const bot = new Bot<TestContext>("test-token");
     bot.use(dialogs<TestContext>({ list: [staticWindow], storage }));
-    bot.command("empty", ctx => ctx.ui.show("empty-vm"));
+    bot.command("empty", (ctx) => ctx.ui.show("empty-vm"));
     const { chats } = await prepareBot(bot);
     await chats.newUser().sendCommand("empty");
 
-    const instance = [...storage.readAllValues()].find(record => record.type === "instance");
-    expect(instance?.type === "instance" ? instance.value.state : undefined).toEqual({});
+    const instance = [...storage.readAllValues()].find(
+      (record) => record.type === "instance",
+    );
+    expect(
+      instance?.type === "instance" ? instance.value.state : undefined,
+    ).toEqual({});
   });
 
   test("defaults widget state schema version to one", () => {
-    const counter = defineKeyboardWidget<{}, number>()({
+    const Counter = defineWidget<{}, number>()({
       state: { initial: () => 0 },
       actions: {},
       render: () => [],
     });
 
-    expect(counter("counter", {}).definition.state.version).toBe(1);
+    expect(
+      (
+        Counter({ id: "counter" }).props.instance as {
+          definition: { state: { version: number } };
+        }
+      ).definition.state.version,
+    ).toBe(1);
   });
 });

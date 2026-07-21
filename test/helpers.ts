@@ -1,15 +1,16 @@
 import type { Context, StorageAdapter } from "grammy";
-import type {
-  DialogFlavor,
-  IdentityCoordinator,
-} from "../src/internal.js";
+import type { DialogFlavor, IdentityCoordinator } from "../src/internal.js";
 
 export type TestContext = Context & DialogFlavor;
 
 export class JsonStorageAdapter<T> implements StorageAdapter<T> {
   protected readonly values = new Map<string, string>();
   private readonly identityLocks = new Map<string, Promise<void>>();
-  private nextWriteFailure?: { prefix: string; error: Error; remaining: number };
+  private nextWriteFailure?: {
+    prefix: string;
+    error: Error;
+    remaining: number;
+  };
   private nextDeleteFailure?: { prefix: string; error: Error };
 
   public readonly identities: IdentityCoordinator = {
@@ -18,21 +19,28 @@ export class JsonStorageAdapter<T> implements StorageAdapter<T> {
 
   public read(key: string): T | undefined {
     const value = this.values.get(key);
-    return value === undefined ? undefined : JSON.parse(value) as T;
+    return value === undefined ? undefined : (JSON.parse(value) as T);
   }
 
   public write(key: string, value: T): void {
-    if (this.nextWriteFailure !== undefined && key.startsWith(this.nextWriteFailure.prefix)) {
+    if (
+      this.nextWriteFailure !== undefined &&
+      key.startsWith(this.nextWriteFailure.prefix)
+    ) {
       const { error } = this.nextWriteFailure;
       this.nextWriteFailure.remaining -= 1;
-      if (this.nextWriteFailure.remaining === 0) this.nextWriteFailure = undefined;
+      if (this.nextWriteFailure.remaining === 0)
+        this.nextWriteFailure = undefined;
       throw error;
     }
     this.values.set(key, JSON.stringify(value));
   }
 
   public delete(key: string): void {
-    if (this.nextDeleteFailure !== undefined && key.startsWith(this.nextDeleteFailure.prefix)) {
+    if (
+      this.nextDeleteFailure !== undefined &&
+      key.startsWith(this.nextDeleteFailure.prefix)
+    ) {
       const { error } = this.nextDeleteFailure;
       this.nextDeleteFailure = undefined;
       throw error;
@@ -45,10 +53,13 @@ export class JsonStorageAdapter<T> implements StorageAdapter<T> {
   }
 
   public readAllValues(): Iterable<T> {
-    return [...this.values.values()].map(value => JSON.parse(value) as T);
+    return [...this.values.values()].map((value) => JSON.parse(value) as T);
   }
 
-  public failNextWrite(prefix: string, error = new Error("storage write failed")): void {
+  public failNextWrite(
+    prefix: string,
+    error = new Error("storage write failed"),
+  ): void {
     this.failNextWrites(prefix, 1, error);
   }
 
@@ -63,7 +74,10 @@ export class JsonStorageAdapter<T> implements StorageAdapter<T> {
     this.nextWriteFailure = { prefix, error, remaining: count };
   }
 
-  public failNextDelete(prefix: string, error = new Error("storage delete failed")): void {
+  public failNextDelete(
+    prefix: string,
+    error = new Error("storage delete failed"),
+  ): void {
     this.nextDeleteFailure = { prefix, error };
   }
 
@@ -73,7 +87,7 @@ export class JsonStorageAdapter<T> implements StorageAdapter<T> {
   ): Promise<Result> {
     const previous = this.identityLocks.get(identity) ?? Promise.resolve();
     let release!: () => void;
-    const current = new Promise<void>(resolve => {
+    const current = new Promise<void>((resolve) => {
       release = resolve;
     });
     this.identityLocks.set(identity, current);
@@ -82,7 +96,8 @@ export class JsonStorageAdapter<T> implements StorageAdapter<T> {
       return await operation();
     } finally {
       release();
-      if (this.identityLocks.get(identity) === current) this.identityLocks.delete(identity);
+      if (this.identityLocks.get(identity) === current)
+        this.identityLocks.delete(identity);
     }
   }
 }

@@ -8,16 +8,25 @@ import type {
   TranslationAdapter,
   WindowDefinition,
 } from "../core.js";
-import type { CallbackCodec, CallbackCodecOptions } from "../callbacks/codec.js";
+import type {
+  CallbackCodec,
+  CallbackCodecOptions,
+} from "../callbacks/codec.js";
 import type { InputRoutingStrategy } from "../input-routing/contracts.js";
 import type {
   DialogStorageRecord,
   IdentityCoordinator,
 } from "../persistence/storage.js";
-import type { CloseStrategy, PresentationStrategy } from "../presentation/contracts.js";
+import type {
+  CloseStrategy,
+  PresentationStrategy,
+} from "../presentation/contracts.js";
 
 /** Configuration accepted by `dialogs()` and `DialogRuntime`. */
-export interface DialogRuntimeOptions<C extends Context = Context, Services = unknown> {
+export interface DialogRuntimeOptions<
+  C extends Context = Context,
+  Services = unknown,
+> {
   /** Dialogs and standalone windows registered by this runtime. */
   list: ReadonlyArray<DialogResource<C>>;
   /** grammY storage adapter; defaults to an in-memory adapter. */

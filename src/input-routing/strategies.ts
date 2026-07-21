@@ -18,7 +18,9 @@ export interface InputRoutingStrategies {
     fallback?: "latest" | "oldest" | "none";
   }): InputRoutingStrategy<C>;
   /** Uses an application-defined routing strategy. */
-  custom<C extends Context = Context>(strategy: InputRoutingStrategy<C>): InputRoutingStrategy<C>;
+  custom<C extends Context = Context>(
+    strategy: InputRoutingStrategy<C>,
+  ): InputRoutingStrategy<C>;
 }
 
 /** Built-in focused-input routing strategies. */
@@ -33,15 +35,20 @@ export const inputRouting: InputRoutingStrategies = {
   }),
   focused: () => ({
     id: "focused",
-    route: ({ candidates }) => candidates.length === 1 ? candidates[0]?.id : undefined,
+    route: ({ candidates }) =>
+      candidates.length === 1 ? candidates[0]?.id : undefined,
   }),
   replyOrFocused: () => ({
     id: "reply-or-focused",
     route: ({ ctx, candidates }) => {
       const repliedMessageId = ctx.message?.reply_to_message?.message_id;
-      const replied = repliedMessageId === undefined
-        ? undefined
-        : candidates.find(candidate => candidate.instance.surface?.messageId === repliedMessageId);
+      const replied =
+        repliedMessageId === undefined
+          ? undefined
+          : candidates.find(
+              (candidate) =>
+                candidate.instance.surface?.messageId === repliedMessageId,
+            );
       if (replied !== undefined) return replied.id;
       return candidates.length === 1 ? candidates[0]?.id : undefined;
     },
@@ -50,9 +57,13 @@ export const inputRouting: InputRoutingStrategies = {
     id: "reply",
     route: ({ ctx, candidates }) => {
       const repliedMessageId = ctx.message?.reply_to_message?.message_id;
-      const replied = repliedMessageId === undefined
-        ? undefined
-        : candidates.find(candidate => candidate.instance.surface?.messageId === repliedMessageId);
+      const replied =
+        repliedMessageId === undefined
+          ? undefined
+          : candidates.find(
+              (candidate) =>
+                candidate.instance.surface?.messageId === repliedMessageId,
+            );
       return replied?.id;
     },
   }),
@@ -60,16 +71,23 @@ export const inputRouting: InputRoutingStrategies = {
     id: "reply-with-fallback",
     route: ({ ctx, candidates }) => {
       const repliedMessageId = ctx.message?.reply_to_message?.message_id;
-      const replied = repliedMessageId === undefined
-        ? undefined
-        : candidates.find(candidate => candidate.instance.surface?.messageId === repliedMessageId);
+      const replied =
+        repliedMessageId === undefined
+          ? undefined
+          : candidates.find(
+              (candidate) =>
+                candidate.instance.surface?.messageId === repliedMessageId,
+            );
       if (replied !== undefined) return replied.id;
       switch (options.fallback ?? "latest") {
-        case "latest": return candidates.at(-1)?.id;
-        case "oldest": return candidates[0]?.id;
-        case "none": return undefined;
+        case "latest":
+          return candidates.at(-1)?.id;
+        case "oldest":
+          return candidates[0]?.id;
+        case "none":
+          return undefined;
       }
     },
   }),
-  custom: strategy => strategy,
+  custom: (strategy) => strategy,
 };

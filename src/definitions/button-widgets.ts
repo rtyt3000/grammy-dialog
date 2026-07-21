@@ -19,7 +19,8 @@ export interface ActionButtonOptions {
 }
 
 /** Options for an intent button. */
-export interface IntentButtonOptions<Payload = unknown> extends ActionButtonOptions {
+export interface IntentButtonOptions<Payload = unknown>
+  extends ActionButtonOptions {
   readonly payload?: Payload;
 }
 
@@ -61,7 +62,11 @@ export function intentButton<
 }
 
 /** Creates a button that pushes a window onto the navigation stack. */
-export function goButton<C extends Context = Context, View = unknown, Services = unknown>(
+export function goButton<
+  C extends Context = Context,
+  View = unknown,
+  Services = unknown,
+>(
   text: TextSource<C, View, Services>,
   windowId: string,
   options: NavigationButtonOptions = {},
@@ -70,7 +75,11 @@ export function goButton<C extends Context = Context, View = unknown, Services =
 }
 
 /** Creates a button that replaces the current stack frame. */
-export function replaceButton<C extends Context = Context, View = unknown, Services = unknown>(
+export function replaceButton<
+  C extends Context = Context,
+  View = unknown,
+  Services = unknown,
+>(
   text: TextSource<C, View, Services>,
   windowId: string,
   options: NavigationButtonOptions = {},
@@ -79,7 +88,11 @@ export function replaceButton<C extends Context = Context, View = unknown, Servi
 }
 
 /** Creates a button that returns to the previous window. */
-export function backButton<C extends Context = Context, View = unknown, Services = unknown>(
+export function backButton<
+  C extends Context = Context,
+  View = unknown,
+  Services = unknown,
+>(
   text: TextSource<C, View, Services>,
   options: ActionButtonOptions = {},
 ): ButtonDefinition<C, View, Services> {
@@ -87,7 +100,11 @@ export function backButton<C extends Context = Context, View = unknown, Services
 }
 
 /** Creates a button that resets the stack to a new root window. */
-export function resetButton<C extends Context = Context, View = unknown, Services = unknown>(
+export function resetButton<
+  C extends Context = Context,
+  View = unknown,
+  Services = unknown,
+>(
   text: TextSource<C, View, Services>,
   windowId: string,
   options: NavigationButtonOptions = {},
@@ -96,7 +113,11 @@ export function resetButton<C extends Context = Context, View = unknown, Service
 }
 
 /** Creates a button that closes the active dialog instance. */
-export function closeButton<C extends Context = Context, View = unknown, Services = unknown>(
+export function closeButton<
+  C extends Context = Context,
+  View = unknown,
+  Services = unknown,
+>(
   text: TextSource<C, View, Services>,
   options: CloseButtonOptions = {},
 ): ButtonDefinition<C, View, Services> {

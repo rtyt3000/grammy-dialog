@@ -4,5 +4,5 @@
     "noEmit": true,
     "paths": {}
   },
-  "include": ["type-tests/package-exports.ts"]
+  "include": ["type-tests/package-exports.tsx", "type-tests/package-jsx.tsx"]
 }
