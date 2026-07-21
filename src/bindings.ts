@@ -114,7 +114,49 @@ function attachment<Value, Definition>(
 }
 
 /** Typed input bindings that can be used without a DialogKit instance. */
-export const bind = Object.freeze({
+export interface InputBindings {
+  readonly text: TextBindingFactory;
+  readonly photo: AttachmentBindingFactory<PhotoInputValue, PhotoInputDefinition>;
+  readonly video: AttachmentBindingFactory<
+    VideoInputValue,
+    AttachmentInputDefinition<"video">
+  >;
+  readonly animation: AttachmentBindingFactory<
+    AnimationInputValue,
+    AttachmentInputDefinition<"animation">
+  >;
+  readonly audio: AttachmentBindingFactory<
+    AudioInputValue,
+    AttachmentInputDefinition<"audio">
+  >;
+  readonly document: AttachmentBindingFactory<
+    FileInputValue,
+    AttachmentInputDefinition<"document">
+  >;
+  readonly voice: AttachmentBindingFactory<
+    VoiceInputValue,
+    AttachmentInputDefinition<"voice">
+  >;
+  readonly sticker: AttachmentBindingFactory<
+    StickerInputValue,
+    AttachmentInputDefinition<"sticker">
+  >;
+  readonly contact: AttachmentBindingFactory<
+    ContactInputValue,
+    AttachmentInputDefinition<"contact">
+  >;
+  readonly location: AttachmentBindingFactory<
+    LocationInputValue,
+    AttachmentInputDefinition<"location">
+  >;
+  readonly message: AttachmentBindingFactory<
+    MessageInputValue,
+    AttachmentInputDefinition<"message">
+  >;
+}
+
+/** Typed input bindings that can be used without a DialogKit instance. */
+export const bind: InputBindings = Object.freeze({
   text,
   photo: attachment<PhotoInputValue, PhotoInputDefinition>(photoInput),
   video: attachment<VideoInputValue, AttachmentInputDefinition<"video">>(
@@ -147,5 +189,3 @@ export const bind = Object.freeze({
     messageInput,
   ),
 });
-
-export type InputBindings = typeof bind;

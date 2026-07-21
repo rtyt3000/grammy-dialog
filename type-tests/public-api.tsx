@@ -166,9 +166,7 @@ const app = builder.define(() => ({ profile, notice }));
   <Counter id="counter" step={2} />
 </Keyboard>;
 // @ts-expect-error Custom widget props remain inferred.
-<Keyboard>
-  <Counter id="counter" />
-</Keyboard>;
+Counter({ id: "counter" });
 app.dialogs.profile;
 app.windows.notice;
 app.middleware({ services: {} as Services });

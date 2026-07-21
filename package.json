@@ -1,6 +1,6 @@
 {
   "name": "@ppsh/grammy-dialog",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Declarative, MVVM-inspired dialog runtime for grammY",
   "type": "module",
   "main": "./dist/index.js",
